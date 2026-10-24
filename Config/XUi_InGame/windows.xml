@@ -1,35 +1,38 @@
 <configs>
 	<!-- Web Companion controls, on the right side of the map screen (M). Controller: XUiC_CompanionPanel.cs -->
 	<append xpath="/windows">
-		<window name="webCompanionPanel" width="354" height="546" panel="Right" controller="WebCompanion.CompanionPanel, WebCompanion" cursor_area="true">
+		<window name="webCompanionPanel" width="354" height="586" panel="Right" controller="WebCompanion.CompanionPanel, WebCompanion" cursor_area="true">
 			<rect name="header" pos="3,0" height="43" depth="1">
 				<headerbg />
 				<sprite depth="1" name="windowIcon" style="icon32px" pos="4,-5" sprite="ui_game_symbol_map" />
 				<label style="header.name" text="WEB COMPANION" />
 			</rect>
 
-			<rect name="content" depth="0" pos="0,-46" height="500">
-				<sprite depth="0" pos="3,0" width="351" height="500" color="[darkestGrey]" type="sliced" />
-				<sprite depth="8" sprite="menu_empty3px" pos="3,0" width="351" height="500" color="[black]" type="sliced" fillcenter="false" />
+			<rect name="content" depth="0" pos="0,-46" height="540">
+				<sprite depth="0" pos="3,0" width="351" height="540" color="[darkestGrey]" type="sliced" />
+				<sprite depth="8" sprite="menu_empty3px" pos="3,0" width="351" height="540" color="[black]" type="sliced" fillcenter="false" />
 
 				<label depth="1" pos="14,-12" width="90" height="28" text="Follow" font_size="26" />
 				<combobox depth="2" name="cbxFollow" type="ComboBoxList`1[System.String]" value_wrap="true" pos="100,-10" width="244" height="30" />
 
-				<label depth="1" pos="14,-52" width="330" height="28" text="Show on map" font_size="24" color="222,206,163,255" />
-				<togglebutton depth="2" name="show_players" pos="12,-84" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_waypoints" pos="12,-120" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_base" pos="12,-156" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_loot" pos="12,-192" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_vehicles" pos="12,-228" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_quests" pos="12,-264" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_creatures" pos="12,-300" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_other" pos="12,-336" width="330" height="32" font_size="24" />
+				<label depth="1" pos="14,-52" width="90" height="28" text="Zoom" font_size="26" />
+				<combobox depth="2" name="cbxZoom" type="ComboBoxList`1[System.String]" value_wrap="false" pos="100,-50" width="244" height="30" />
 
-				<label depth="1" pos="14,-380" width="330" height="28" text="POI labels (explored areas)" font_size="24" color="222,206,163,255" />
-				<togglebutton depth="2" name="togglePois" pos="12,-412" width="150" height="32" font_size="24" caption="Show" />
-				<combobox depth="2" name="cbxTier" type="ComboBoxList`1[System.String]" value_wrap="false" pos="170,-413" width="174" height="30" />
+				<label depth="1" pos="14,-92" width="330" height="28" text="Show on map" font_size="24" color="222,206,163,255" />
+				<togglebutton depth="2" name="show_players" pos="12,-124" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_waypoints" pos="12,-160" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_base" pos="12,-196" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_loot" pos="12,-232" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_vehicles" pos="12,-268" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_quests" pos="12,-304" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_creatures" pos="12,-340" width="330" height="32" font_size="24" />
+				<togglebutton depth="2" name="show_other" pos="12,-376" width="330" height="32" font_size="24" />
 
-				<label depth="1" name="status" pos="14,-460" width="330" height="28" text="" font_size="22" />
+				<label depth="1" pos="14,-420" width="330" height="28" text="POI labels (explored areas)" font_size="24" color="222,206,163,255" />
+				<togglebutton depth="2" name="togglePois" pos="12,-452" width="150" height="32" font_size="24" caption="Show" />
+				<combobox depth="2" name="cbxTier" type="ComboBoxList`1[System.String]" value_wrap="false" pos="170,-453" width="174" height="30" />
+
+				<label depth="1" name="status" pos="14,-500" width="330" height="28" text="" font_size="22" />
 			</rect>
 		</window>
 	</append>

@@ -13,6 +13,7 @@ namespace WebCompanion
         private const float RefreshInterval = 1f;
 
         private XUiC_ComboBoxList<string> cbxFollow;
+        private XUiC_ComboBoxList<string> cbxZoom;
         private XUiC_ComboBoxList<string> cbxTier;
         private XUiC_ToggleButton togglePois;
         private readonly XUiC_ToggleButton[] categoryToggles = new XUiC_ToggleButton[CompanionSettings.Categories.Length];
@@ -32,6 +33,14 @@ namespace WebCompanion
             base.Init();
             cbxFollow = GetChildById("cbxFollow") as XUiC_ComboBoxList<string>;
             if (cbxFollow != null) cbxFollow.OnValueChanged += OnFollowChanged;
+
+            cbxZoom = GetChildById("cbxZoom") as XUiC_ComboBoxList<string>;
+            if (cbxZoom != null)
+            {
+                cbxZoom.Elements.Clear();
+                for (int z = CompanionSettings.MinZoom; z <= CompanionSettings.MaxZoom; z++) cbxZoom.Elements.Add(CompanionSettings.ZoomName(z));
+                cbxZoom.OnValueChanged += (_sender, _old, _new) => CompanionSettings.SetZoom(CompanionSettings.MinZoom + cbxZoom.SelectedIndex);
+            }
 
             cbxTier = GetChildById("cbxTier") as XUiC_ComboBoxList<string>;
             if (cbxTier != null)
@@ -147,6 +156,7 @@ namespace WebCompanion
             }
             if (togglePois != null) togglePois.Value = CompanionSettings.ShowPois;
             if (cbxTier != null) cbxTier.SelectedIndex = CompanionSettings.PoiMinTier;
+            if (cbxZoom != null) cbxZoom.SelectedIndex = CompanionSettings.Zoom - CompanionSettings.MinZoom;
         }
 
         private void SelectFollow()

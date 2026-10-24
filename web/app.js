@@ -524,6 +524,8 @@ function connect() {
   es.addEventListener('view', (ev) => {
     settings = JSON.parse(ev.data);
     hidden = new Set(settings.hide);
+    // Zoom set in the game's panel; ignored right after zooming here, when it's just our own change coming back
+    if (typeof settings.zoom === 'number' && performance.now() - zoomedAt > 1500) view.scale = Math.pow(2, settings.zoom);
     follow = settings.follow !== 'free';
     updateFollowButton();
     invalidateLayer();
@@ -686,6 +688,7 @@ function setRenderer(name) {
   if (!glr) name = 'canvas';
   renderer = name;
   glCanvas.style.display = name === 'webgl' ? 'block' : 'none';
+  updateReadout();
   layer.valid = false;
   for (const t of tiles.values()) t.dirty = true;  // the canvas copies of tiles may be stale
   try { localStorage.setItem('renderer', name); } catch (err) { /* private window */ }
@@ -893,10 +896,10 @@ function updateReadout() {
     lines.push('Cursor  ' + fmt(wz, 'N', 'S') + ', ' + fmt(wx, 'E', 'W'));
   }
   lines.push('Zoom    ' + (view.scale >= 1 ? view.scale + 'x' : '1/' + (1 / view.scale) + 'x'));
+  lines.push('Render  ' + (renderer === 'webgl' ? 'WebGL' : 'Cached canvas') + '  (G)');
   if (diag.show) {
     lines.push('Lag     ' + diag.lag + ' ms (worst 5 min ' + diagMax(diag.worstLag) + ')');
     lines.push('Busy    worst 5 min ' + diagMax(diag.busy) + ' ms');
-    lines.push('Render  ' + renderer + ' (G switches)');
     if (diag.fps) lines.push('FPS     ' + diag.fps + ' while moving');
     for (const st of diag.stalls) lines.push('Stall   ' + st);
   }
@@ -908,6 +911,8 @@ function updateReadout() {
 function toggleFollow() {
   setFollowTarget(follow ? 'free' : 'self');
 }
+
+let zoomedAt = -Infinity;  // last zoom on this page
 
 function zoomAt(factor, sx, sy) {
   const next = Math.min(8, Math.max(1 / 16, view.scale * factor));
@@ -922,6 +927,9 @@ function zoomAt(factor, sx, sy) {
     view.x += wx - wx2;
     view.z += wz - wz2;
   }
+  zoomedAt = performance.now();
+  fetch('/view?zoom=' + Math.round(Math.log2(view.scale)), { method: 'POST', headers: { 'X-Companion': '1' } })
+    .catch((err) => console.warn('could not send zoom change', err));
   requestDraw();
 }
 

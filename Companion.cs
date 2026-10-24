@@ -103,10 +103,12 @@ namespace WebCompanion
 
         private static void TickInner()
         {
-            string follow;
-            while (WebHost.FollowRequests.TryDequeue(out follow))
+            string request;
+            while (WebHost.ViewRequests.TryDequeue(out request))
             {
-                CompanionSettings.SetFollow(follow);
+                int zoom;
+                if (request.StartsWith("follow=")) CompanionSettings.SetFollow(request.Substring(7));
+                else if (request.StartsWith("zoom=") && int.TryParse(request.Substring(5), out zoom)) CompanionSettings.SetZoom(zoom);
             }
 
             GameManager gm = GameManager.Instance;

@@ -19,10 +19,15 @@ namespace WebCompanion
 
         public const int MaxTier = 5;
 
+        // Page zoom as a power of two: -4 is 1/16x (whole map), 3 is 8x
+        public const int MinZoom = -4;
+        public const int MaxZoom = 3;
+
         // "self", "free" or a player's entity id
         public static string Follow { get; private set; } = FollowSelf;
         public static bool ShowPois { get; private set; } = true;
         public static int PoiMinTier { get; private set; } = 1;
+        public static int Zoom { get; private set; }
 
         // Bumped on every change, so the panel knows to refresh
         public static int Version { get; private set; }
@@ -72,6 +77,19 @@ namespace WebCompanion
             Changed(true);
         }
 
+        public static void SetZoom(int _zoom)
+        {
+            _zoom = Math.Max(MinZoom, Math.Min(MaxZoom, _zoom));
+            if (_zoom == Zoom) return;
+            Zoom = _zoom;
+            Changed(true);
+        }
+
+        public static string ZoomName(int _zoom)
+        {
+            return _zoom >= 0 ? (1 << _zoom) + "x" : "1/" + (1 << -_zoom) + "x";
+        }
+
         // A new world: follow yourself again (entity ids don't carry over)
         public static void ResetFollow()
         {
@@ -104,6 +122,7 @@ namespace WebCompanion
                         }
                         else if (key == "pois") ShowPois = value != "false";
                         else if (key == "poiMinTier" && int.TryParse(value, out n)) PoiMinTier = Math.Max(0, Math.Min(MaxTier, n));
+                        else if (key == "zoom" && int.TryParse(value, out n)) Zoom = Math.Max(MinZoom, Math.Min(MaxZoom, n));
                     }
                 }
             }
@@ -129,7 +148,8 @@ namespace WebCompanion
                 File.WriteAllText(FilePath,
                     "hidden=" + string.Join(",", hidden) + "\n" +
                     "pois=" + (ShowPois ? "true" : "false") + "\n" +
-                    "poiMinTier=" + PoiMinTier + "\n");
+                    "poiMinTier=" + PoiMinTier + "\n" +
+                    "zoom=" + Zoom + "\n");
             }
             catch (Exception ex)
             {
@@ -137,7 +157,7 @@ namespace WebCompanion
             }
         }
 
-        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n}
+        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":n}
         private static string ToJson()
         {
             StringBuilder sb = new StringBuilder("{\"follow\":");
@@ -151,7 +171,8 @@ namespace WebCompanion
                 first = false;
             }
             sb.Append("],\"pois\":").Append(ShowPois ? "true" : "false");
-            sb.Append(",\"poiMinTier\":").Append(PoiMinTier).Append('}');
+            sb.Append(",\"poiMinTier\":").Append(PoiMinTier);
+            sb.Append(",\"zoom\":").Append(Zoom).Append('}');
             return sb.ToString();
         }
     }

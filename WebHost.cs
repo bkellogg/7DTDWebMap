@@ -88,8 +88,8 @@ namespace WebCompanion
         private static volatile string poisJson;
         private static int poisVersion;
 
-        // Follow requests from the page ("self", "free" or an entity id), applied by the main thread
-        public static readonly ConcurrentQueue<string> FollowRequests = new ConcurrentQueue<string>();
+        // View changes from the page, applied by the main thread: "follow=<self|free|entity id>" or "zoom=<n>"
+        public static readonly ConcurrentQueue<string> ViewRequests = new ConcurrentQueue<string>();
 
         private static readonly object clientsLock = new object();
         private static readonly List<SseClient> clients = new List<SseClient>();
@@ -588,7 +588,9 @@ namespace WebCompanion
                     return;
                 }
                 string follow = req.QueryString["follow"];
-                if (!string.IsNullOrEmpty(follow) && follow.Length <= 16) FollowRequests.Enqueue(follow);
+                if (!string.IsNullOrEmpty(follow) && follow.Length <= 16) ViewRequests.Enqueue("follow=" + follow);
+                string zoom = req.QueryString["zoom"];
+                if (!string.IsNullOrEmpty(zoom) && zoom.Length <= 3) ViewRequests.Enqueue("zoom=" + zoom);
                 Finish(res, 204, "text/plain", new byte[0]);
                 return;
             }
