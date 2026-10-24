@@ -21,12 +21,23 @@ header { height: 40px; display: flex; align-items: center; justify-content: spac
 main { position: absolute; top: 40px; left: 0; right: 0; bottom: 0; }
 .panel { display: none; position: absolute; inset: 0; }
 
-/* Workstations sidebar (ws.js); the map moves over to make room */
-:root { --ws-width: 300px; }
-#ws { display: none; position: absolute; top: 0; bottom: 0; left: 0; width: var(--ws-width); overflow-y: auto;
-  background: var(--panel); border-right: 1px solid var(--border); padding: 8px; }
+/* Workstations sidebar (ws.js) on the edge picked in the panel; the map shrinks to make room.
+   Left/right: a column of cards. Top/bottom: a strip of cards side by side, scrolling sideways. */
+:root { --ws-width: 300px; --ws-height: 230px; }
+#ws { display: none; position: absolute; background: var(--panel); padding: 8px; }
 body.ws-on #ws { display: block; }
-body.ws-on .panel { left: var(--ws-width); }
+body.ws-left #ws, body.ws-right #ws { top: 0; bottom: 0; width: var(--ws-width); overflow-y: auto; }
+body.ws-left #ws { left: 0; border-right: 1px solid var(--border); }
+body.ws-right #ws { right: 0; border-left: 1px solid var(--border); }
+body.ws-left .panel { left: var(--ws-width); }
+body.ws-right .panel { right: var(--ws-width); }
+body.ws-top #ws, body.ws-bottom #ws { left: 0; right: 0; height: var(--ws-height); display: flex; flex-direction: column; }
+body.ws-top #ws { top: 0; border-bottom: 1px solid var(--border); }
+body.ws-bottom #ws { bottom: 0; border-top: 1px solid var(--border); }
+body.ws-top .panel { top: var(--ws-height); }
+body.ws-bottom .panel { bottom: var(--ws-height); }
+body.ws-top #ws-list, body.ws-bottom #ws-list { flex: 1; min-height: 0; display: flex; gap: 8px; overflow-x: auto; }
+body.ws-top .ws-card, body.ws-bottom .ws-card { flex: none; width: 280px; margin-bottom: 0; overflow-y: auto; }
 .ws-header { font-weight: 600; padding: 2px 4px 8px; color: var(--text); }
 #ws-count { color: var(--muted); font-weight: 400; margin-left: 4px; }
 .ws-empty { color: var(--muted); padding: 4px; margin: 0; }

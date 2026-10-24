@@ -28,11 +28,17 @@ function wsClear() {
   wsRender();
 }
 
-// The sidebar takes space from the map rather than covering it, so the followed player stays centred
+// The sidebar takes space from the map rather than covering it, so the followed player stays centred.
+// It sits on the edge chosen in the panel (ws-left, ws-right, ws-top or ws-bottom on the body).
+let wsSide = '';
 function wsUpdateVisibility() {
   const show = !!(settings.ws && settings.ws.show);
-  if (show === wsShown) return;
+  const side = show ? (settings.ws.side || 'left') : '';
+  if (side === wsSide) return;
+  if (wsSide) document.body.classList.remove('ws-' + wsSide);
+  if (side) document.body.classList.add('ws-' + side);
   wsShown = show;
+  wsSide = side;
   document.body.classList.toggle('ws-on', show);
   resize();
   wsRender();

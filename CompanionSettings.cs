@@ -40,6 +40,11 @@ namespace WebMap
         // Workstations sidebar: shown at all, only active ones, and which types (WorkstationTracker.Types plus "other") are hidden
         public static bool ShowWorkstations { get; private set; }  // off until turned on in the panel
         public static bool WorkstationsActiveOnly { get; private set; }
+
+        // Which edge of the page the sidebar sits on; index into WorkstationSides
+        public static readonly string[] WorkstationSides = { "left", "right", "top", "bottom" };
+        public static readonly string[] WorkstationSideNames = { "Left", "Right", "Top", "Bottom" };
+        public static int WorkstationSide { get; private set; }
         public const string OtherWorkstation = "other";
         private static readonly HashSet<string> hiddenWorkstations = new HashSet<string>();
 
@@ -87,6 +92,13 @@ namespace WebMap
         {
             if (_show == ShowWorkstations) return;
             ShowWorkstations = _show;
+            Changed(true);
+        }
+
+        public static void SetWorkstationSide(int _side)
+        {
+            if (_side < 0 || _side >= WorkstationSides.Length || _side == WorkstationSide) return;
+            WorkstationSide = _side;
             Changed(true);
         }
 
@@ -194,6 +206,7 @@ namespace WebMap
                         else if (key == "pois") ShowPois = value != "false";
                         else if (key == "workstations") ShowWorkstations = value == "true";
                         else if (key == "workstationsActiveOnly") WorkstationsActiveOnly = value == "true";
+                        else if (key == "workstationsSide") WorkstationSide = Math.Max(0, Array.IndexOf(WorkstationSides, value));
                         else if (key == "workstationsHidden")
                         {
                             foreach (string t in value.Split(','))
@@ -240,6 +253,7 @@ namespace WebMap
                     "poiMinTier=" + PoiMinTier + "\n" +
                     "workstations=" + (ShowWorkstations ? "true" : "false") + "\n" +
                     "workstationsActiveOnly=" + (WorkstationsActiveOnly ? "true" : "false") + "\n" +
+                    "workstationsSide=" + WorkstationSides[WorkstationSide] + "\n" +
                     "workstationsHidden=" + string.Join(",", hiddenWorkstations) + "\n" +
                     "zoomScale=" + ZoomSteps[Zoom].ToString(CultureInfo.InvariantCulture) + "\n" + sb);
             }
@@ -250,7 +264,7 @@ namespace WebMap
         }
 
         // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":scale,"sizes":{"poi":100,...},
-        //  "ws":{"show":bool,"active":bool,"hide":[type,...]}}
+        //  "ws":{"show":bool,"side":"left"|"right"|"top"|"bottom","active":bool,"hide":[type,...]}}
         private static string ToJson()
         {
             StringBuilder sb = new StringBuilder("{\"follow\":");
@@ -273,6 +287,7 @@ namespace WebMap
                 sb.Append('"').Append(SizeKeys[i]).Append("\":").Append(sizes[i]);
             }
             sb.Append("},\"ws\":{\"show\":").Append(ShowWorkstations ? "true" : "false");
+            sb.Append(",\"side\":\"").Append(WorkstationSides[WorkstationSide]).Append('"');
             sb.Append(",\"active\":").Append(WorkstationsActiveOnly ? "true" : "false").Append(",\"hide\":[");
             first = true;
             foreach (string t in hiddenWorkstations)

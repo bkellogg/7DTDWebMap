@@ -4,7 +4,7 @@ using UnityEngine.Scripting;
 
 namespace WebMap
 {
-    // The "Web Map" panel on the right side of the map screen (M). Window in Config/XUi_InGame/windows.xml.
+    // The "Web Map" panel on the right side of the map screen (M). Window in XUi/windows.xml.
     // Only runs while the map screen is open.
     [Preserve]
     [SuppressMessage("ReSharper", "UnusedType.Global")]
@@ -21,6 +21,7 @@ namespace WebMap
         private readonly XUiC_ComboBoxList<string>[] sizeBoxes = new XUiC_ComboBoxList<string>[CompanionSettings.SizeKeys.Length];
         private XUiC_ToggleButton toggleWorkstations;
         private XUiC_ToggleButton toggleWorkstationsActive;
+        private XUiC_ComboBoxList<string> cbxWorkstationSide;
         private readonly XUiC_ToggleButton[] workstationToggles = new XUiC_ToggleButton[WorkstationTypes.Length];
 
         // Pages: the usual settings, workstations, and text/icon sizes; the buttons at the bottom switch between them
@@ -99,6 +100,13 @@ namespace WebMap
 
             toggleWorkstations = GetChildById("ws_show") as XUiC_ToggleButton;
             if (toggleWorkstations != null) toggleWorkstations.OnValueChanged += (_sender, _value) => CompanionSettings.SetShowWorkstations(_value);
+            cbxWorkstationSide = GetChildById("ws_side") as XUiC_ComboBoxList<string>;
+            if (cbxWorkstationSide != null)
+            {
+                cbxWorkstationSide.Elements.Clear();
+                cbxWorkstationSide.Elements.AddRange(CompanionSettings.WorkstationSideNames);
+                cbxWorkstationSide.OnValueChanged += (_sender, _old, _new) => CompanionSettings.SetWorkstationSide(cbxWorkstationSide.SelectedIndex);
+            }
             toggleWorkstationsActive = GetChildById("ws_active") as XUiC_ToggleButton;
             if (toggleWorkstationsActive != null)
                 toggleWorkstationsActive.OnValueChanged += (_sender, _value) => CompanionSettings.SetWorkstationsActiveOnly(_value);
@@ -243,6 +251,7 @@ namespace WebMap
             if (togglePois != null) togglePois.Value = CompanionSettings.ShowPois;
             if (toggleWorkstations != null) toggleWorkstations.Value = CompanionSettings.ShowWorkstations;
             if (toggleWorkstationsActive != null) toggleWorkstationsActive.Value = CompanionSettings.WorkstationsActiveOnly;
+            if (cbxWorkstationSide != null) cbxWorkstationSide.SelectedIndex = CompanionSettings.WorkstationSide;
             for (int i = 0; i < workstationToggles.Length; i++)
             {
                 if (workstationToggles[i] != null) workstationToggles[i].Value = !CompanionSettings.IsWorkstationHidden(WorkstationTypes[i]);

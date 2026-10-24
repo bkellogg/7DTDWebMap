@@ -42,7 +42,7 @@ Open the map screen (**M**). The **Web Map** panel on the right has three pages:
 | Page | Settings |
 |------|----------|
 | Main | Follow (you, a party member, or free), zoom, which markers to show, POI labels and minimum tier |
-| Workstations | Show the sidebar (off until you turn it on), only working ones, which types to show |
+| Workstations | Show the sidebar (off until you turn it on) and which edge it sits on (left, right, top or bottom), only working ones, which types to show |
 | Text & icon sizes | Size of POI labels, marker labels, your name and icons |
 
 Settings are saved in `WebMap.txt` in the game's user data folder (`%AppData%\7DaysToDie`).

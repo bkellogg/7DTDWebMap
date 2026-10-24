@@ -48,7 +48,8 @@
 
 			<rect name="pageWorkstations" depth="1" pos="0,0" width="354" height="490" visible="false">
 				<label depth="1" pos="14,-12" width="330" height="28" text="Workstations sidebar" font_size="24" color="222,206,163,255" />
-				<togglebutton depth="2" name="ws_show" pos="12,-44" width="330" height="32" font_size="24" caption="Show the sidebar" />
+				<togglebutton depth="2" name="ws_show" pos="12,-44" width="150" height="32" font_size="24" caption="Show" />
+				<combobox depth="2" name="ws_side" type="ComboBoxList`1[System.String]" value_wrap="true" pos="170,-45" width="174" height="30" />
 				<togglebutton depth="2" name="ws_active" pos="12,-80" width="330" height="32" font_size="24" caption="Only ones that are working" />
 				<label depth="1" pos="14,-124" width="330" height="28" text="Types" font_size="24" color="222,206,163,255" />
 				<togglebutton depth="2" name="ws_type_campfire" pos="12,-156" width="330" height="32" font_size="24" />
