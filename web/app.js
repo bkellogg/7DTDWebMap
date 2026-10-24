@@ -6,6 +6,7 @@ const TILE_PX = TILE_CHUNKS * 16;
 const CHUNK_BYTES = 8 + 512;
 
 const canvas = document.getElementById('map');
+const glCanvas = document.getElementById('mapgl');  // under the 2D canvas, used by the WebGL renderer
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
@@ -53,9 +54,11 @@ let follow = true;  // settings.follow !== 'free'
 // POIs for labels: { name, x, z, w, h, tier, key (center chunk) }; drawn only where the map is explored.
 // Traders are left out, their map marker already shows the name.
 let pois = [];
-const SKULL = 'ui_game_symbol_skull', SKULL_COLOR = '#e8e8e8';
+const SKULL = 'ui_game_symbol_skull', SKULL_COLOR = '#ff0000';  // the game's [red] difficulty skulls
 let poiKeys = new Set(); // center chunks of all POIs, to spot a newly explored one
 let centeredOnce = false;
+let renderer = 'canvas';  // 'canvas' or 'webgl' (G switches)
+let glr = null;           // WebGL renderer, see gl.js
 let mouse = null;   // last mouse position over the canvas, for the readout
 
 // ---- In-game map look ----
@@ -295,8 +298,14 @@ function setPoiFont(g, dpr) {
 
 // Lays out the POI outlines and labels in layer coordinates and draws them
 function drawPois(g, W, H, dpr) {
-  layer.labels = [];
-  if (!settings.pois || !pois.length) return;
+  layer.labels = layoutPois(g, 0, 0, W, H, dpr);
+  for (const e of layer.labels) drawPoi(g, e, dpr);
+}
+
+// Where each POI's outline and label go, for POIs inside the given box (in worldToScreen coordinates)
+function layoutPois(g, bx0, by0, bx1, by1, dpr) {
+  const entries = [];
+  if (!settings.pois || !pois.length) return entries;
   const fontPx = 12 * dpr;
   const skull = Math.round(11 * dpr);
   setPoiFont(g, dpr);
@@ -306,7 +315,7 @@ function drawPois(g, W, H, dpr) {
     if (p.tier < settings.poiMinTier) continue;
     const [x, y] = worldToScreen(p.x, p.z);
     const hw = p.w / 2 * view.scale * dpr, hh = p.h / 2 * view.scale * dpr;
-    if (x + hw < 0 || y + hh < 0 || x - hw > W || y - hh > H) continue;
+    if (x + hw < bx0 || y + hh < by0 || x - hw > bx1 || y - hh > by1) continue;
     if (!chunks.has(p.key)) continue;
     const e = { p, x, y, hw, hh, outline: outlines && hw > 8 * dpr, x0: 0, ly: null, skull };
 
@@ -327,9 +336,9 @@ function drawPois(g, W, H, dpr) {
     e.bx1 = Math.max(x + hw, e.ly === null ? -Infinity : x1) + 4 * dpr;
     e.by0 = Math.min(y - hh, e.ly === null ? Infinity : e.ly - half) - 4 * dpr;
     e.by1 = Math.max(y + hh, e.ly === null ? -Infinity : e.ly + half) + 4 * dpr;
-    layer.labels.push(e);
+    entries.push(e);
   }
-  for (const e of layer.labels) drawPoi(g, e, dpr);
+  return entries;
 }
 
 function drawPoi(g, e, dpr) {
@@ -442,9 +451,11 @@ function renderChunk(cx, cz, colors) {
     data[i + 3] = mask ? mask[j] : 255;
   }
   t.dirty = true;
+  t.glDirty = true;
 }
 
 function clearMap() {
+  if (glr) glr.forgetTiles();
   tiles.clear();
   chunks.clear();
   layer.valid = false;
@@ -649,7 +660,7 @@ function diagFrame(start, end, moving) {
     diag.reportedAt = 0;
     diagReport('frames while moving: ' + diag.fps + ' fps, worst gap ' + Math.round(fps.gapMax) + ' ms, draw script ' +
       (fps.costSum / fps.frames).toFixed(1) + ' ms avg / ' + Math.round(fps.costMax) + ' ms max, POI labels ' +
-      (settings.pois ? 'on' : 'off') + ', zoom ' + view.scale + ', canvas ' + canvas.width + 'x' + canvas.height);
+      (settings.pois ? 'on' : 'off') + ', ' + renderer + ', zoom ' + view.scale + ', canvas ' + canvas.width + 'x' + canvas.height);
   }
   fps.frames = fps.gapSum = fps.gapMax = fps.costSum = fps.costMax = 0;
   fps.since = start;
@@ -670,6 +681,17 @@ setInterval(() => {
 
 // ---- Drawing ----
 
+function setRenderer(name) {
+  if (name === 'webgl' && !glr) glr = createGlRenderer(glCanvas);
+  if (!glr) name = 'canvas';
+  renderer = name;
+  glCanvas.style.display = name === 'webgl' ? 'block' : 'none';
+  layer.valid = false;
+  for (const t of tiles.values()) t.dirty = true;  // the canvas copies of tiles may be stale
+  try { localStorage.setItem('renderer', name); } catch (err) { /* private window */ }
+  requestDraw();
+}
+
 function invalidateLayer() {
   layer.valid = false;
   requestDraw();
@@ -686,6 +708,8 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(canvas.clientWidth * dpr);
   canvas.height = Math.round(canvas.clientHeight * dpr);
+  glCanvas.width = canvas.width;
+  glCanvas.height = canvas.height;
   requestDraw();
 }
 
@@ -718,7 +742,12 @@ function draw() {
   const W = canvas.width, H = canvas.height;
   if (!W || !H) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  drawLayer(W, H, dpr);
+  if (renderer === 'webgl' && !glr.lost) {
+    glr.draw(W, H, dpr);
+    ctx.clearRect(0, 0, W, H);
+  } else {
+    drawLayer(W, H, dpr);
+  }
   drawNavs(dpr);
   if (player) drawPlayer(dpr);
 
@@ -867,6 +896,7 @@ function updateReadout() {
   if (diag.show) {
     lines.push('Lag     ' + diag.lag + ' ms (worst 5 min ' + diagMax(diag.worstLag) + ')');
     lines.push('Busy    worst 5 min ' + diagMax(diag.busy) + ' ms');
+    lines.push('Render  ' + renderer + ' (G switches)');
     if (diag.fps) lines.push('FPS     ' + diag.fps + ' while moving');
     for (const st of diag.stalls) lines.push('Stall   ' + st);
   }
@@ -930,10 +960,14 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') zoomAt(2);
   else if (e.key === '-') zoomAt(0.5);
   else if (e.key === 'd' || e.key === 'D') { diag.show = !diag.show; updateReadout(); }
+  else if (e.key === 'g' || e.key === 'G') setRenderer(renderer === 'webgl' ? 'canvas' : 'webgl');
 });
 window.addEventListener('resize', resize);
 
 resize();
+let savedRenderer = null;
+try { savedRenderer = localStorage.getItem('renderer'); } catch (err) { /* private window */ }
+setRenderer(new URLSearchParams(location.search).get('renderer') || savedRenderer || 'webgl');
 updateOverlay();
 loadLook();
 connect();
