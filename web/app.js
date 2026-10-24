@@ -51,7 +51,7 @@ let navOrder = [];        // markers sorted by layer, lowest first (the game's p
 // Traders from the POI list, as markers. The game's own trader marker belongs to the trader NPC and vanishes when
 // that unloads; its lasting store icon only appears once you've walked into the trader's area. Shown once the
 // trader's chunk is explored, unless the game's store icon is already there.
-const TRADER_SPRITE = 'ui_game_symbol_map_trader';
+const TRADER_SPRITE = 'ui_game_symbol_map_trader', TRADER_NPC_SPRITE = 'ui_game_symbol_talk';
 let traderMarks = [];
 const NAV_EASE_MS = 100;  // markers update 10 times a second
 const view = { x: 0, z: 0, scale: 1 }; // world point at screen center, screen px per block
@@ -171,8 +171,10 @@ function applyNavs(d) {
   requestDraw();
 }
 
+// The trader NPC's own marker (a yellow talk icon) is dropped inside a trader POI: the store icon already marks it
 function rebuildNavOrder() {
-  const real = Array.from(navs.values());
+  const inTrader = (n) => traderMarks.some((t) => Math.abs(n.x - t.x) <= t.w / 2 + 8 && Math.abs(n.z - t.z) <= t.h / 2 + 8);
+  const real = Array.from(navs.values()).filter((n) => !(n.s === TRADER_NPC_SPRITE && inTrader(n)));
   const extra = traderMarks.filter((t) => !real.some((n) => n.s === TRADER_SPRITE &&
     Math.abs(n.x - t.x) < 64 && Math.abs(n.z - t.z) < 64));
   navOrder = real.concat(extra).sort((a, b) => a.layer - b.layer);
@@ -278,8 +280,8 @@ async function loadPois() {
     }));
     // Higher tiers win when labels collide
     pois.sort((a, b) => b.tier - a.tier);
-    traderMarks = list.filter((p) => p[6]).map(([name, x, z]) => ({
-      k: 'trader:' + x + ',' + z, x, z, dx: x, dz: z, r: 0, dr: 0, s: TRADER_SPRITE, l: tidyName(name), c: '#ffffffff',
+    traderMarks = list.filter((p) => p[6]).map(([name, x, z, w, h]) => ({
+      k: 'trader:' + x + ',' + z, x, z, w, h, dx: x, dz: z, r: 0, dr: 0, s: TRADER_SPRITE, l: tidyName(name), c: '#ffffffff',
       sx: 1, sy: 1, layer: 0, ac: false, cat: 'quests', explore: Math.floor(x / 16) + ',' + Math.floor(z / 16),
     }));
     rebuildNavOrder();
