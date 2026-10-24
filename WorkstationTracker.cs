@@ -83,17 +83,31 @@ namespace WebMap
             for (int i = 0; i < scratchIds.Count; i++)
             {
                 EntityPlayer player = world.GetEntity(scratchIds[i]) as EntityPlayer;
-                if (player == null)
+                ClientInfo client;
+                if (player == null || !TryGetConnection(world, player.entityId, out client))
                 {
-                    // Left the game
+                    // Left the game: forget them before doing any work for them
                     subscribers.Remove(scratchIds[i]);
                     continue;
                 }
-                UpdateFor(world, gm.persistentPlayers, player, subscribers[scratchIds[i]]);
+                UpdateFor(world, gm.persistentPlayers, player, client, subscribers[scratchIds[i]]);
             }
         }
 
-        private static void UpdateFor(World _world, PersistentPlayerList _players, EntityPlayer _player, Subscriber _sub)
+        // Where a subscriber's updates go: the local player (single player or hosting) gets them in-process
+        // (_client null), anyone else only over their own connection, and only while it's logged in
+        private static bool TryGetConnection(World _world, int _entityId, out ClientInfo _client)
+        {
+            _client = null;
+            EntityPlayerLocal local = _world.GetPrimaryPlayer();
+            if (local != null && local.entityId == _entityId) return true;
+            ConnectionManager cm = SingletonMonoBehaviour<ConnectionManager>.Instance;
+            if (cm == null || !cm.IsServer || cm.Clients == null) return false;
+            _client = cm.Clients.ForEntityId(_entityId);
+            return _client != null && _client.loginDone;
+        }
+
+        private static void UpdateFor(World _world, PersistentPlayerList _players, EntityPlayer _player, ClientInfo _client, Subscriber _sub)
         {
             // Claims of this player and everyone in their party
             claims.Clear();
@@ -179,7 +193,7 @@ namespace WebMap
                 delIds.Add(Id(scratch[i]));
             }
             if (!full && setJson.Count == 0 && delIds.Count == 0) return;
-            Send(_world, _player.entityId, full, setJson, delIds);
+            Send(_client, full, setJson, delIds);
         }
 
         private static void AddClaims(PersistentPlayerList _players, int _entityId)
@@ -277,17 +291,15 @@ namespace WebMap
             s.Shape = shape.ToString();
         }
 
-        private static void Send(World _world, int _entityId, bool _full, List<string> _set, List<string> _del)
+        // To this one player only, never a broadcast. Null client: the local player.
+        private static void Send(ClientInfo _client, bool _full, List<string> _set, List<string> _del)
         {
-            // The local player (single player or hosting) gets it directly
-            EntityPlayerLocal local = _world.GetPrimaryPlayer();
-            if (local != null && local.entityId == _entityId)
+            if (_client == null)
             {
                 WorkstationClient.Receive(_full, _set, _del);
                 return;
             }
-            NetPackageWebMap pkg = NetPackageManager.GetPackage<NetPackageWebMap>().SetupWorkstations(_full, _set, _del);
-            SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(pkg, false, _entityId);
+            _client.SendPackage(NetPackageManager.GetPackage<NetPackageWebMap>().SetupWorkstations(_full, _set, _del));
         }
 
         private static string F(float _v)
