@@ -30,7 +30,8 @@ function wsClear() {
 // The cards float over the map along the edge chosen in the panel (ws-left, ws-right, ws-top or ws-bottom on the body)
 let wsSide = '';
 function wsUpdateVisibility() {
-  const show = !!(settings.ws && settings.ws.show);
+  // Only while in a game: the cards go away when the game disconnects or goes back to the menu
+  const show = !!(settings.ws && settings.ws.show) && connected && gameState === 'ingame';
   const side = show ? (settings.ws.side || 'left') : '';
   if (side === wsSide) return;
   if (wsSide) document.body.classList.remove('ws-' + wsSide);

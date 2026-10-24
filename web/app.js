@@ -491,10 +491,10 @@ async function pull() {
 function connect() {
   const es = new EventSource('/events');
   es.onopen = () => { connected = true; updateOverlay(); };
-  es.onerror = () => { connected = false; updateOverlay(); };
+  es.onerror = () => { connected = false; wsClear(); updateOverlay(); };  // the game resends them on reconnect
   es.addEventListener('state', (ev) => {
     gameState = JSON.parse(ev.data).state;
-    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; traderMarks = []; pois = []; poiLayout.valid = false; }
+    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; traderMarks = []; pois = []; poiLayout.valid = false; wsClear(); }
     updateOverlay();
     requestDraw();
   });
@@ -557,6 +557,7 @@ function updateOverlay() {
   const key = !glr ? 'nogl' : !connected ? 'offline' : gameState === 'ingame' ? null : gameState;
   const info = key ? STATES[key] || STATES.menu : null;
   overlayEl.hidden = !info;
+  wsUpdateVisibility();
   if (info) {
     overlayTitle.textContent = info[0];
     overlayText.textContent = info[1];
