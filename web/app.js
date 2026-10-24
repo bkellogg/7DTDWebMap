@@ -750,6 +750,11 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.width, H = canvas.height;
   if (!W || !H) return;
+  // Draw with the view snapped to whole pixels, so the map and the (pixel-aligned) POI labels move together
+  // instead of the labels hopping against the map as it slides
+  const vx = view.x, vz = view.z, s = view.scale * dpr;
+  view.x = (W / 2 - Math.round(W / 2 - vx * s)) / s;
+  view.z = (Math.round(H / 2 + vz * s) - H / 2) / s;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (renderer === 'webgl' && !glr.lost) {
     glr.draw(W, H, dpr);
@@ -759,6 +764,8 @@ function draw() {
   }
   drawNavs(dpr);
   if (player) drawPlayer(dpr);
+  view.x = vx;
+  view.z = vz;
 
   updateReadout();
   if (moving) requestDraw();
