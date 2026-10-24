@@ -1,6 +1,0 @@
-<configs>
-	<!-- Adds the Web Map panel (windows.xml) to the map screen -->
-	<append xpath="/xui/window_group[@name='map']">
-		<window name="webMapPanel" />
-	</append>
-</configs>

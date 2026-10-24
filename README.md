@@ -28,7 +28,10 @@ Everything is controlled from inside the game, in a panel on the map screen (**M
 3. Start the game and load a world.
 4. Open `http://127.0.0.1:26910/` in a browser.
 
-**Multiplayer:** install the mod on the server as well as on each client. The map panel's layout is sent by the server, and workstations are tracked by the server. Without the mod on the server, the map still works but the sidebar says it can't show workstations.
+**Multiplayer:** each player who wants the map installs the mod. Nobody else needs it:
+
+- **Players without the mod can join a server that runs it**, with no errors and nothing extra on their screen.
+- **Players with the mod can join a server without it.** The map, markers and panel all work. Only the workstations sidebar needs the mod on the server, and it says so when the server lacks it.
 
 The web server only listens on `127.0.0.1` and only answers pages loaded from that address, so nothing is exposed to your network or the internet.
 
@@ -65,6 +68,7 @@ The overriding rule is **near-zero cost on the game's main thread**.
 
 - **Client (your game):** a small web server (`SpaceWizards.HttpListener`, which ships with the game) runs on its own thread. The main thread only copies small pieces of state into a queue: changed map chunks, your position, marker changes. A background thread builds the responses and pushes updates to the browser with Server-Sent Events. With no browser open, the mod does nothing per frame.
 - **Server:** for each player with the map open, every 2 seconds it looks at the loaded chunks inside their and their party's land claims, snapshots the workstations there, and sends only what changed in a custom `NetPackage`. Nothing runs while nobody has the map open.
+- **Mixed installs:** normally a client that doesn't know one of the server's package types refuses to connect. The server lists ours under a name that vanilla clients skip, and modded clients map it back. The panel isn't in `Config/` (the server would send it to everyone); each modded client adds it to its own map screen when the XUi loads.
 - **Browser:** does all the drawing and all the timer countdowns, so the game never sends per-second updates.
 
 | File | Role |
@@ -75,9 +79,10 @@ The overriding rule is **near-zero cost on the game's main thread**.
 | `NavMirror.cs` | Copies the in-game map's markers |
 | `WebHost.cs` | Web server, background pusher, map mirror |
 | `CompanionSettings.cs` | Settings, saved and pushed to the page |
-| `XUiC_CompanionPanel.cs`, `Config/XUi_InGame/` | The panel on the map screen |
+| `XUiC_CompanionPanel.cs`, `XUi/windows.xml`, `XUiInject.cs` | The panel on the map screen, added on the client only |
 | `WorkstationTracker.cs` | Server side of the workstations sidebar |
-| `WorkstationClient.cs`, `NetPackages.cs` | Client subscription and network packages |
+| `WorkstationClient.cs`, `NetPackages.cs` | Client subscription and the network package |
+| `NetCompat.cs` | Lets players without the mod join a server that has it |
 | `web/` | The page: `app.js` (map), `gl.js` (WebGL renderer), `ws.js` (workstations sidebar) |
 | `tools/` | Scripts that extract the map's textures from the game files |
 
@@ -90,7 +95,7 @@ Requires the game installed, and MSBuild (Visual Studio, Rider or the .NET SDK) 
    ```
    msbuild WebMap.csproj /p:Configuration=Debug
    ```
-   The build copies the DLL, `ModInfo.xml`, `Config/` and `web/` into `Mods\WebMap` in the game folder.
+   The build copies the DLL, `ModInfo.xml`, `XUi/` and `web/` into `Mods\WebMap` in the game folder.
 
 The code is C# 7.3 (the game's .NET Framework 4.8 runtime), so no newer language features.
 

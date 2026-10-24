@@ -60,6 +60,14 @@
             <HintPath>$(GamePath)\Mods\0_TFP_Harmony\0Harmony.dll</HintPath>
             <Private>False</Private>
         </Reference>
+        <Reference Include="System.Xml">
+            <HintPath>$(GamePath)\7DaysToDie_Data\Managed\System.Xml.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
+        <Reference Include="System.Xml.Linq">
+            <HintPath>$(GamePath)\7DaysToDie_Data\Managed\System.Xml.Linq.dll</HintPath>
+            <Private>False</Private>
+        </Reference>
         <Reference Include="System"/>
         <Reference Include="System.Core"/>
     </ItemGroup>
@@ -76,11 +84,13 @@
         <Compile Include="WorkstationTracker.cs"/>
         <Compile Include="WorkstationClient.cs"/>
         <Compile Include="NetPackages.cs"/>
+        <Compile Include="NetCompat.cs"/>
+        <Compile Include="XUiInject.cs"/>
     </ItemGroup>
     <ItemGroup>
         <None Include="ModInfo.xml"/>
         <None Include="web\**"/>
-        <None Include="Config\**"/>
+        <None Include="XUi\**"/>
     </ItemGroup>
     <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
 
@@ -96,10 +106,9 @@
             <WebFiles Include="$(ProjectDir)web\**\*"/>
         </ItemGroup>
         <Copy SourceFiles="@(WebFiles)" DestinationFolder="$(ModFolder)\web\%(RecursiveDir)"/>
-        <ItemGroup>
-            <ConfigFiles Include="$(ProjectDir)Config\**\*"/>
-        </ItemGroup>
-        <Copy SourceFiles="@(ConfigFiles)" DestinationFolder="$(ModFolder)\Config\%(RecursiveDir)"/>
+        <Copy SourceFiles="$(ProjectDir)XUi\windows.xml" DestinationFolder="$(ModFolder)\XUi"/>
+        <!-- Older builds shipped the panel in Config/, which the server would send to every client -->
+        <RemoveDir Directories="$(ModFolder)\Config"/>
         <Message Text="Deployed $(ModName) to $(ModFolder)" Importance="high"/>
     </Target>
 

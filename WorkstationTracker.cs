@@ -286,7 +286,7 @@ namespace WebMap
                 WorkstationClient.Receive(_full, _set, _del);
                 return;
             }
-            NetPackageWebMapWorkstations pkg = NetPackageManager.GetPackage<NetPackageWebMapWorkstations>().Setup(_full, _set, _del);
+            NetPackageWebMap pkg = NetPackageManager.GetPackage<NetPackageWebMap>().SetupWorkstations(_full, _set, _del);
             SingletonMonoBehaviour<ConnectionManager>.Instance.SendPackage(pkg, false, _entityId);
         }
 

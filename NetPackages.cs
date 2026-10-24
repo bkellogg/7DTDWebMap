@@ -4,55 +4,38 @@ using UnityEngine.Scripting;
 
 namespace WebMap
 {
-    // Client -> server: this player's web map is open (and showing workstations), or not any more
+    // The mod's only network package, in both directions. One type so NetCompat has a single slot to hide from
+    // clients without the mod.
+    //   Client -> server, Subscribe: this player's web map is open (and showing workstations), or not any more.
+    //   Server -> client, Workstations: workstations that changed (JSON objects, see WorkstationTracker.Snapshot)
+    //   and ids removed. Full means this is everything the player can see; the client drops any not listed.
     [Preserve]
     [SuppressMessage("ReSharper", "UnusedType.Global")]
-    public class NetPackageWebMapSubscribe : NetPackage
+    public class NetPackageWebMap : NetPackage
     {
-        private bool on;
+        private const byte KindSubscribe = 0;
+        private const byte KindWorkstations = 1;
 
-        public override NetPackageDirection PackageDirection => NetPackageDirection.ToServer;
-
-        public NetPackageWebMapSubscribe Setup(bool _on)
-        {
-            on = _on;
-            return this;
-        }
-
-        public override void read(PooledBinaryReader _reader)
-        {
-            on = _reader.ReadBoolean();
-        }
-
-        public override void write(PooledBinaryWriter _writer)
-        {
-            base.write(_writer);
-            _writer.Write(on);
-        }
-
-        public override void ProcessPackage(World _world, GameManager _callbacks)
-        {
-            if (_world == null || Sender == null) return;
-            WorkstationTracker.SetSubscribed(Sender.entityId, on);
-        }
-    }
-
-    // Server -> client: workstations that changed (JSON objects, see WorkstationTracker.Snapshot) and ids removed.
-    // Full means this is everything the player can see; the client drops any it has that aren't listed.
-    [Preserve]
-    [SuppressMessage("ReSharper", "UnusedType.Global")]
-    public class NetPackageWebMapWorkstations : NetPackage
-    {
-        private bool full;
+        private byte kind;
+        private bool flag; // Subscribe: on. Workstations: full.
         private readonly List<string> set = new List<string>();
         private readonly List<string> del = new List<string>();
 
-        public override NetPackageDirection PackageDirection => NetPackageDirection.ToClient;
         public override bool Compress => true;
 
-        public NetPackageWebMapWorkstations Setup(bool _full, List<string> _set, List<string> _del)
+        public NetPackageWebMap SetupSubscribe(bool _on)
         {
-            full = _full;
+            kind = KindSubscribe;
+            flag = _on;
+            set.Clear();
+            del.Clear();
+            return this;
+        }
+
+        public NetPackageWebMap SetupWorkstations(bool _full, List<string> _set, List<string> _del)
+        {
+            kind = KindWorkstations;
+            flag = _full;
             set.Clear();
             set.AddRange(_set);
             del.Clear();
@@ -62,7 +45,8 @@ namespace WebMap
 
         public override void read(PooledBinaryReader _reader)
         {
-            full = _reader.ReadBoolean();
+            kind = _reader.ReadByte();
+            flag = _reader.ReadBoolean();
             set.Clear();
             int n = _reader.ReadInt32();
             for (int i = 0; i < n; i++) set.Add(_reader.ReadString());
@@ -74,7 +58,8 @@ namespace WebMap
         public override void write(PooledBinaryWriter _writer)
         {
             base.write(_writer);
-            _writer.Write(full);
+            _writer.Write(kind);
+            _writer.Write(flag);
             _writer.Write(set.Count);
             for (int i = 0; i < set.Count; i++) _writer.Write(set[i]);
             _writer.Write(del.Count);
@@ -84,7 +69,15 @@ namespace WebMap
         public override void ProcessPackage(World _world, GameManager _callbacks)
         {
             if (_world == null) return;
-            WorkstationClient.Receive(full, set, del);
+            bool isServer = SingletonMonoBehaviour<ConnectionManager>.Instance.IsServer;
+            if (kind == KindSubscribe)
+            {
+                if (isServer && Sender != null) WorkstationTracker.SetSubscribed(Sender.entityId, flag);
+            }
+            else if (kind == KindWorkstations)
+            {
+                if (!isServer) WorkstationClient.Receive(flag, set, del);
+            }
         }
     }
 }
