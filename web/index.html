@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7DTD Companion</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <nav>
+    <button class="tab active" data-tab="map">Map</button>
+    <button class="tab" data-tab="workstations" disabled title="Coming in a later milestone">Workstations</button>
+  </nav>
+  <div id="status" class="status off">Connecting…</div>
+</header>
+<main>
+  <section id="tab-map" class="panel active">
+    <canvas id="map"></canvas>
+    <div class="controls">
+      <button id="follow" class="on" title="Keep the map centered on you (F)">Follow</button>
+      <button id="zoomin" title="Zoom in (+)">+</button>
+      <button id="zoomout" title="Zoom out (-)">−</button>
+    </div>
+    <div id="readout" class="readout"></div>
+    <div id="overlay" class="overlay" hidden>
+      <div class="overlay-card">
+        <h1 id="overlay-title"></h1>
+        <p id="overlay-text"></p>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

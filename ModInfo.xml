@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xml>
+    <Name value="WebCompanion" />
+    <DisplayName value="WebCompanion" />
+    <Description value="Second-screen companion: open http://127.0.0.1:26910/ in a browser to see your full map live. Prototype." />
+    <Author value="bkellogg" />
+    <Version value="0.1.0" />
+</xml>
