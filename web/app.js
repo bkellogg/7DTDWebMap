@@ -47,7 +47,12 @@ let lastPosAt = 0;
 // Each has the game's values (x, z, r, s sprite, l label, c color, sx/sy scale, layer, ac) plus the drawn
 // position (dx, dz, dr), which eases toward x/z/r when a marker moves.
 const navs = new Map();
-let navOrder = [];        // markers sorted by layer, lowest first
+let navOrder = [];        // markers sorted by layer, lowest first (the game's plus traderMarks)
+// Traders from the POI list, as markers. The game's own trader marker belongs to the trader NPC and vanishes when
+// that unloads; its lasting store icon only appears once you've walked into the trader's area. Shown once the
+// trader's chunk is explored, unless the game's store icon is already there.
+const TRADER_SPRITE = 'ui_game_symbol_map_trader';
+let traderMarks = [];
 const NAV_EASE_MS = 100;  // markers update 10 times a second
 const view = { x: 0, z: 0, scale: 1 }; // world point at screen center, screen px per block
 
@@ -160,9 +165,17 @@ function applyNavs(d) {
   }
   for (const k of d.del) navs.delete(k);
   // POI labels dodge markers; re-lay them out when markers come or go (not when they move)
-  if (d.full || d.del.length || navOrder.length !== navs.size) poiLayout.valid = false;
-  navOrder = Array.from(navs.values()).sort((a, b) => a.layer - b.layer);
+  const before = navs.size;
+  rebuildNavOrder();
+  if (d.full || d.del.length || before !== navs.size) poiLayout.valid = false;
   requestDraw();
+}
+
+function rebuildNavOrder() {
+  const real = Array.from(navs.values());
+  const extra = traderMarks.filter((t) => !real.some((n) => n.s === TRADER_SPRITE &&
+    Math.abs(n.x - t.x) < 64 && Math.abs(n.z - t.z) < 64));
+  navOrder = real.concat(extra).sort((a, b) => a.layer - b.layer);
 }
 
 // Eases moving markers toward their latest position. Returns true while any is still moving.
@@ -220,7 +233,7 @@ function drawNavs(dpr) {
   const labels = [];  // text, x, y, color
   const k = sizeOf('icons');
   for (const n of navOrder) {
-    if (hidden.has(n.cat)) continue;
+    if (hidden.has(n.cat) || (n.explore && !chunks.has(n.explore))) continue;
     const icon = iconFor(n.s, n.c);
     if (!icon) continue;
     const w = Math.min(56, Math.max(10, 26 * n.sx * zoom)) * dpr * k;
@@ -265,7 +278,12 @@ async function loadPois() {
     }));
     // Higher tiers win when labels collide
     pois.sort((a, b) => b.tier - a.tier);
-    poiKeys = new Set(pois.map((q) => q.key));
+    traderMarks = list.filter((p) => p[6]).map(([name, x, z]) => ({
+      k: 'trader:' + x + ',' + z, x, z, dx: x, dz: z, r: 0, dr: 0, s: TRADER_SPRITE, l: tidyName(name), c: '#ffffffff',
+      sx: 1, sy: 1, layer: 0, ac: false, cat: 'quests', explore: Math.floor(x / 16) + ',' + Math.floor(z / 16),
+    }));
+    rebuildNavOrder();
+    poiKeys = new Set(pois.map((q) => q.key).concat(traderMarks.map((t) => t.explore)));
     invalidateLayout();
   } catch (err) {
     console.warn('POI list not loaded', err);
@@ -285,7 +303,7 @@ function markerBoxes(dpr) {
   const boxes = [];
   const zoom = Math.min(1.6, Math.max(0.6, Math.sqrt(view.scale)));
   for (const n of navOrder) {
-    if (hidden.has(n.cat)) continue;
+    if (hidden.has(n.cat) || (n.explore && !chunks.has(n.explore))) continue;
     const [x, y] = worldToScreen(n.dx, n.dz);
     const r = Math.min(56, Math.max(10, 26 * Math.max(n.sx, n.sy) * zoom)) * dpr / 2 * sizeOf('icons');
     boxes.push(x - r, y - r, x + r, y + r);
@@ -474,7 +492,7 @@ function connect() {
   es.onerror = () => { connected = false; updateOverlay(); };
   es.addEventListener('state', (ev) => {
     gameState = JSON.parse(ev.data).state;
-    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; pois = []; poiLayout.valid = false; }
+    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; traderMarks = []; pois = []; poiLayout.valid = false; }
     updateOverlay();
     requestDraw();
   });
@@ -493,6 +511,7 @@ function connect() {
     track.length = 0;
     navs.clear();
     navOrder = [];
+    traderMarks = [];
     wsClear();
     pois = [];
     poiLayout.valid = false;
