@@ -38,7 +38,7 @@ namespace WebMap
         public static int Zoom { get; private set; } = DefaultZoom;
 
         // Workstations sidebar: shown at all, only active ones, and which types (WorkstationTracker.Types plus "other") are hidden
-        public static bool ShowWorkstations { get; private set; } = true;
+        public static bool ShowWorkstations { get; private set; }  // off until turned on in the panel
         public static bool WorkstationsActiveOnly { get; private set; }
         public const string OtherWorkstation = "other";
         private static readonly HashSet<string> hiddenWorkstations = new HashSet<string>();
@@ -192,7 +192,7 @@ namespace WebMap
                             }
                         }
                         else if (key == "pois") ShowPois = value != "false";
-                        else if (key == "workstations") ShowWorkstations = value != "false";
+                        else if (key == "workstations") ShowWorkstations = value == "true";
                         else if (key == "workstationsActiveOnly") WorkstationsActiveOnly = value == "true";
                         else if (key == "workstationsHidden")
                         {

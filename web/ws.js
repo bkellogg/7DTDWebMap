@@ -30,7 +30,7 @@ function wsClear() {
 
 // The sidebar takes space from the map rather than covering it, so the followed player stays centred
 function wsUpdateVisibility() {
-  const show = !settings.ws || settings.ws.show !== false;
+  const show = !!(settings.ws && settings.ws.show);
   if (show === wsShown) return;
   wsShown = show;
   document.body.classList.toggle('ws-on', show);
