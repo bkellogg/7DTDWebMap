@@ -35,6 +35,7 @@ namespace WebMap
             public bool Flag;
             public List<PoiInfo> Pois;
             public long Stamp;
+            public long GameMs;
         }
 
         // One POI for the page's labels, copied on the main thread
@@ -88,7 +89,7 @@ namespace WebMap
         private static volatile string poisJson;
         private static int poisVersion;
 
-        // View changes from the page, applied by the main thread: "follow=<self|free|entity id>" or "zoom=<n>"
+        // View changes from the page, applied by the main thread: "follow=<self|free|entity id>" or "zoom=<scale>"
         public static readonly ConcurrentQueue<string> ViewRequests = new ConcurrentQueue<string>();
 
         private static readonly object clientsLock = new object();
@@ -174,11 +175,11 @@ namespace WebMap
             wake.Set();
         }
 
-        public static void PostPosition(float _x, float _y, float _z, float _yaw)
+        public static void PostPosition(float _x, float _y, float _z, float _yaw, long _gameMs)
         {
             // Unix ms when the game posted it, so the page can tell game pauses from delivery delays
             long stamp = (DateTime.UtcNow.Ticks - 621355968000000000L) / 10000L;
-            inbox.Enqueue(new Msg { Kind = KindPosition, A = _x, B = _y, C = _z, D = _yaw, Stamp = stamp });
+            inbox.Enqueue(new Msg { Kind = KindPosition, A = _x, B = _y, C = _z, D = _yaw, Stamp = stamp, GameMs = _gameMs });
             wake.Set();
         }
 
@@ -269,7 +270,7 @@ namespace WebMap
                         bufferPool.Add(m.Data);
                         break;
                     case KindPosition:
-                        pendingPos = "{\"x\":" + F(m.A) + ",\"y\":" + F(m.B) + ",\"z\":" + F(m.C) + ",\"yaw\":" + F(m.D) + ",\"ts\":" + m.Stamp + "}";
+                        pendingPos = "{\"x\":" + F(m.A) + ",\"y\":" + F(m.B) + ",\"z\":" + F(m.C) + ",\"yaw\":" + F(m.D) + ",\"ts\":" + m.Stamp + ",\"gt\":" + m.GameMs + "}";
                         break;
                     case KindWorld:
                         worldJson = "{\"minX\":" + m.X + ",\"minZ\":" + m.Z + ",\"maxX\":" + (int)m.A + ",\"maxZ\":" + (int)m.B +
@@ -590,7 +591,7 @@ namespace WebMap
                 string follow = req.QueryString["follow"];
                 if (!string.IsNullOrEmpty(follow) && follow.Length <= 16) ViewRequests.Enqueue("follow=" + follow);
                 string zoom = req.QueryString["zoom"];
-                if (!string.IsNullOrEmpty(zoom) && zoom.Length <= 3) ViewRequests.Enqueue("zoom=" + zoom);
+                if (!string.IsNullOrEmpty(zoom) && zoom.Length <= 8) ViewRequests.Enqueue("zoom=" + zoom);
                 Finish(res, 204, "text/plain", new byte[0]);
                 return;
             }

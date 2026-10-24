@@ -34,9 +34,16 @@ let world = null;   // { minX, minZ, maxX, maxZ, player }
 let connected = false;
 let gameState = 'menu'; // menu | loading | ingame
 
-// Smooth movement: the game sends position about 20 times a second; the page eases from where the
-// arrow is drawn to each new position over roughly one update interval instead of jumping.
-let posFrom = null, posTo = null, posStart = 0, posDuration = 50, lastPosAt = 0;
+// Smooth movement: each position carries the game time it was sampled at (gt). The page plays them back on
+// its own steady clock a few frames behind, interpolating between the samples either side of that moment,
+// so movement is evenly spaced however unevenly updates arrive.
+const track = [];         // { gt, x, y, z, yaw }, oldest first
+let clockOffset = null;   // page time minus game time used for playback; glides toward offsetTarget
+let offsetTarget = 0;     // page time minus game time for the quickest of the recent deliveries
+const offsets = [];       // recent deliveries' page-minus-game times
+let lastStep = 0;
+let sampleGap = 16.7;     // typical game time between samples, ms
+let lastPosAt = 0;
 
 // Map markers (waypoints, bedroll, land claims, backpack, quests, vehicles, party members...), by key.
 // Each has the game's values (x, z, r, s sprite, l label, c color, sx/sy scale, layer, ac) plus the drawn
@@ -503,7 +510,7 @@ function connect() {
   es.onerror = () => { connected = false; updateOverlay(); };
   es.addEventListener('state', (ev) => {
     gameState = JSON.parse(ev.data).state;
-    if (gameState !== 'ingame') { player = posFrom = posTo = null; world = null; navs.clear(); navOrder = []; pois = []; layer.valid = false; }
+    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; pois = []; layer.valid = false; }
     updateOverlay();
     requestDraw();
   });
@@ -518,7 +525,8 @@ function connect() {
     clearMap();
     epoch = wantEpoch = d.epoch;
     wantSeq = 0;
-    player = posFrom = posTo = null;
+    player = null;
+    track.length = 0;
     navs.clear();
     navOrder = [];
     pois = [];
@@ -531,7 +539,7 @@ function connect() {
     settings = JSON.parse(ev.data);
     hidden = new Set(settings.hide);
     // Zoom set in the game's panel; ignored right after zooming here, when it's just our own change coming back
-    if (typeof settings.zoom === 'number' && performance.now() - zoomedAt > 1500) view.scale = Math.pow(2, settings.zoom);
+    if (typeof settings.zoom === 'number' && performance.now() - zoomedAt > 1500) view.scale = settings.zoom;
     follow = settings.follow !== 'free';
     updateFollowButton();
     invalidateLayer();
@@ -542,17 +550,7 @@ function connect() {
     const p = JSON.parse(ev.data);
     const now = performance.now();
     diagPos(p, lastPosAt ? now - lastPosAt : 0);
-    if (!player || now - lastPosAt > 1000) {
-      // First position, or after a pause (teleport, alt-tab): jump straight there
-      player = { x: p.x, y: p.y, z: p.z, yaw: p.yaw };
-      posFrom = posTo = null;
-    } else {
-      // Ease over about one update interval, smoothed so jittery delivery doesn't stutter
-      posDuration = Math.min(250, Math.max(16, posDuration * 0.8 + (now - lastPosAt) * 0.2));
-      posFrom = { x: player.x, y: player.y, z: player.z, yaw: player.yaw };
-      posTo = p;
-      posStart = now;
-    }
+    addSample(p, now);
     lastPosAt = now;
     if (!centeredOnce) { view.x = player.x; view.z = player.z; centeredOnce = true; }
     requestDraw();
@@ -581,16 +579,55 @@ function updateOverlay() {
   statusEl.classList.toggle('off', !connected);
 }
 
-// Moves the drawn arrow toward the latest position. Returns true while still moving.
+function addSample(p, now) {
+  const gt = p.gt !== undefined ? p.gt : now;  // older mod builds send no game time
+  const s = { gt, x: p.x, y: p.y, z: p.z, yaw: p.yaw };
+  const last = track[track.length - 1];
+  if (!player || !last || gt <= last.gt || Math.hypot(s.x - last.x, s.z - last.z) > 64) {
+    // First position, a teleport or a game restart: jump straight there
+    track.length = 0;
+    track.push(s);
+    player = { x: s.x, y: s.y, z: s.z, yaw: s.yaw };
+    clockOffset = offsetTarget = now - gt;
+    offsets.length = 0;
+    return;
+  }
+  const gap = gt - last.gt;
+  if (gap > 4 * sampleGap) {
+    // Starting off after standing still: hold the old spot until one sample before this one
+    track.push({ gt: gt - sampleGap, x: last.x, y: last.y, z: last.z, yaw: last.yaw });
+  } else {
+    sampleGap += (Math.min(100, Math.max(4, gap)) - sampleGap) * 0.1;
+  }
+  track.push(s);
+  offsets.push(now - gt);
+  if (offsets.length > 120) offsets.shift();
+  offsetTarget = Math.min.apply(null, offsets);
+}
+
+// Places the drawn arrow at the playback time. Returns true while it still has somewhere to go.
 function stepPlayer(now) {
-  if (!posTo) return false;
-  const t = Math.max(0, Math.min(1, (now - posStart) / posDuration));
-  player.x = posFrom.x + (posTo.x - posFrom.x) * t;
-  player.y = posFrom.y + (posTo.y - posFrom.y) * t;
-  player.z = posFrom.z + (posTo.z - posFrom.z) * t;
-  let dYaw = ((posTo.yaw - posFrom.yaw) % 360 + 540) % 360 - 180; // shortest way round
-  player.yaw = posFrom.yaw + dYaw * t;
-  if (t >= 1) { posFrom = posTo = null; return false; }
+  if (!track.length) return false;
+  // Glide the playback clock toward the target at most 5% faster or slower than real time, so a change in
+  // delivery speed never shows as a jump; far off (the page was asleep) just snaps
+  const dt = Math.min(100, now - lastStep), diff = offsetTarget - clockOffset;
+  lastStep = now;
+  clockOffset += Math.abs(diff) > 250 ? diff : Math.max(-dt * 0.05, Math.min(dt * 0.05, diff));
+  const delay = Math.min(120, 2 * sampleGap + 8);  // enough to always have the next sample in hand
+  const rt = now - clockOffset - delay;
+  while (track.length > 2 && track[1].gt <= rt) track.shift();
+  const a = track[0], b = track[1];
+  if (!b || rt <= a.gt || rt >= b.gt) {
+    const s = !b || rt <= a.gt ? a : b;
+    player.x = s.x; player.y = s.y; player.z = s.z; player.yaw = s.yaw;
+    return rt < track[track.length - 1].gt;
+  }
+  const f = (rt - a.gt) / (b.gt - a.gt);
+  player.x = a.x + (b.x - a.x) * f;
+  player.y = a.y + (b.y - a.y) * f;
+  player.z = a.z + (b.z - a.z) * f;
+  const dYaw = ((b.yaw - a.yaw) % 360 + 540) % 360 - 180;  // shortest way round
+  player.yaw = a.yaw + dYaw * f;
   return true;
 }
 
@@ -858,7 +895,9 @@ function drawTiles(g, x0, y0, x1, y1, dpr) {
     const [x, y] = worldToScreen(t.rx * TILE_PX, (t.rz + 1) * TILE_PX);
     if (x > x1 || y > y1 || x + size < x0 || y + size < y0) continue;
     if (t.dirty) { t.ctx.putImageData(t.img, 0, 0); t.dirty = false; }
-    g.drawImage(t.canvas, x, y, size, size);
+    // Whole-pixel edges, so neighbouring tiles meet without a seam at in-between zooms
+    const l = Math.round(x), tp = Math.round(y);
+    g.drawImage(t.canvas, l, tp, Math.round(x + size) - l, Math.round(y + size) - tp);
   }
 }
 
@@ -908,7 +947,7 @@ function updateReadout() {
     const [wx, wz] = screenToWorld(mouse.x, mouse.y);
     lines.push('Cursor  ' + fmt(wz, 'N', 'S') + ', ' + fmt(wx, 'E', 'W'));
   }
-  lines.push('Zoom    ' + (view.scale >= 1 ? view.scale + 'x' : '1/' + (1 / view.scale) + 'x'));
+  lines.push('Zoom    ' + (view.scale < 1 && Number.isInteger(1 / view.scale) ? '1/' + (1 / view.scale) : view.scale) + 'x');
   lines.push('Render  ' + (renderer === 'webgl' ? 'WebGL' : 'Cached canvas') + '  (G)');
   if (diag.show) {
     lines.push('Lag     ' + diag.lag + ' ms (worst 5 min ' + diagMax(diag.worstLag) + ')');
@@ -926,9 +965,16 @@ function toggleFollow() {
 }
 
 let zoomedAt = -Infinity;  // last zoom on this page
+// Same steps as the game's panel (CompanionSettings.ZoomSteps)
+const ZOOM_STEPS = [0.0625, 0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8];
 
-function zoomAt(factor, sx, sy) {
-  const next = Math.min(8, Math.max(1 / 16, view.scale * factor));
+// Zooms one step in (+1) or out (-1)
+function zoomAt(dir, sx, sy) {
+  let i = 0;
+  for (let j = 1; j < ZOOM_STEPS.length; j++) {
+    if (Math.abs(Math.log(ZOOM_STEPS[j] / view.scale)) < Math.abs(Math.log(ZOOM_STEPS[i] / view.scale))) i = j;
+  }
+  const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, i + dir))];
   if (next === view.scale) return;
   if (sx === undefined || follow) {
     view.scale = next;
@@ -941,7 +987,7 @@ function zoomAt(factor, sx, sy) {
     view.z += wz - wz2;
   }
   zoomedAt = performance.now();
-  fetch('/view?zoom=' + Math.round(Math.log2(view.scale)), { method: 'POST', headers: { 'X-WebMap': '1' } })
+  fetch('/view?zoom=' + view.scale, { method: 'POST', headers: { 'X-WebMap': '1' } })
     .catch((err) => console.warn('could not send zoom change', err));
   requestDraw();
 }
@@ -970,16 +1016,16 @@ canvas.addEventListener('pointerleave', () => { mouse = null; requestDraw(); });
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   const r = canvas.getBoundingClientRect();
-  zoomAt(e.deltaY < 0 ? 2 : 0.5, e.clientX - r.left, e.clientY - r.top);
+  zoomAt(e.deltaY < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top);
 }, { passive: false });
 
 followBtn.addEventListener('click', toggleFollow);
-document.getElementById('zoomin').addEventListener('click', () => zoomAt(2));
-document.getElementById('zoomout').addEventListener('click', () => zoomAt(0.5));
+document.getElementById('zoomin').addEventListener('click', () => zoomAt(1));
+document.getElementById('zoomout').addEventListener('click', () => zoomAt(-1));
 window.addEventListener('keydown', (e) => {
   if (e.key === 'f' || e.key === 'F') toggleFollow();
-  else if (e.key === '+' || e.key === '=') zoomAt(2);
-  else if (e.key === '-') zoomAt(0.5);
+  else if (e.key === '+' || e.key === '=') zoomAt(1);
+  else if (e.key === '-') zoomAt(-1);
   else if (e.key === 'd' || e.key === 'D') { diag.show = !diag.show; updateReadout(); }
   else if (e.key === 'g' || e.key === 'G') setRenderer(renderer === 'webgl' ? 'canvas' : 'webgl');
 });

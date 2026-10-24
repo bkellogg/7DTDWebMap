@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -19,9 +20,9 @@ namespace WebMap
 
         public const int MaxTier = 5;
 
-        // Page zoom as a power of two: -4 is 1/16x (whole map), 3 is 8x
-        public const int MinZoom = -4;
-        public const int MaxZoom = 3;
+        // Page zoom steps, screen pixels per block: 1/16 shows the whole map. The page's wheel and buttons use the same steps.
+        public static readonly double[] ZoomSteps = { 0.0625, 0.125, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8 };
+        private const int DefaultZoom = 5;  // 1x
 
         // Text and icon sizes on the page, in percent
         public static readonly string[] SizeKeys = { "poi", "marker", "player", "icons" };
@@ -33,7 +34,8 @@ namespace WebMap
         public static string Follow { get; private set; } = FollowSelf;
         public static bool ShowPois { get; private set; } = true;
         public static int PoiMinTier { get; private set; } = 1;
-        public static int Zoom { get; private set; }
+        // Index into ZoomSteps
+        public static int Zoom { get; private set; } = DefaultZoom;
 
         // Bumped on every change, so the panel knows to refresh
         public static int Version { get; private set; }
@@ -87,7 +89,7 @@ namespace WebMap
 
         public static void SetZoom(int _zoom)
         {
-            _zoom = Math.Max(MinZoom, Math.Min(MaxZoom, _zoom));
+            _zoom = Math.Max(0, Math.Min(ZoomSteps.Length - 1, _zoom));
             if (_zoom == Zoom) return;
             Zoom = _zoom;
             Changed(true);
@@ -106,9 +108,23 @@ namespace WebMap
             Changed(true);
         }
 
+        // The step closest to a scale
+        public static int NearestZoom(double _scale)
+        {
+            int best = DefaultZoom;
+            for (int i = 0; i < ZoomSteps.Length; i++)
+            {
+                if (Math.Abs(Math.Log(ZoomSteps[i] / _scale)) < Math.Abs(Math.Log(ZoomSteps[best] / _scale))) best = i;
+            }
+            return best;
+        }
+
         public static string ZoomName(int _zoom)
         {
-            return _zoom >= 0 ? (1 << _zoom) + "x" : "1/" + (1 << -_zoom) + "x";
+            double s = ZoomSteps[_zoom];
+            double inverse = 1 / s;
+            if (s < 1 && inverse == Math.Floor(inverse)) return "1/" + inverse + "x";
+            return s.ToString(CultureInfo.InvariantCulture) + "x";
         }
 
         // A new world: follow yourself again (entity ids don't carry over)
@@ -135,6 +151,7 @@ namespace WebMap
                         string key = line.Substring(0, eq).Trim();
                         string value = line.Substring(eq + 1).Trim();
                         int n;
+                        double scale;
                         if (key == "hidden")
                         {
                             foreach (string c in value.Split(','))
@@ -144,7 +161,9 @@ namespace WebMap
                         }
                         else if (key == "pois") ShowPois = value != "false";
                         else if (key == "poiMinTier" && int.TryParse(value, out n)) PoiMinTier = Math.Max(0, Math.Min(MaxTier, n));
-                        else if (key == "zoom" && int.TryParse(value, out n)) Zoom = Math.Max(MinZoom, Math.Min(MaxZoom, n));
+                        else if (key == "zoomScale" && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out scale) && scale > 0) Zoom = NearestZoom(scale);
+                        // Older settings saved zoom as a power of two
+                        else if (key == "zoom" && int.TryParse(value, out n)) Zoom = NearestZoom(Math.Pow(2, n));
                         else if (key.StartsWith("size_") && int.TryParse(value, out n) && Array.IndexOf(SizeSteps, n) >= 0)
                         {
                             int i = Array.IndexOf(SizeKeys, key.Substring(5));
@@ -178,7 +197,7 @@ namespace WebMap
                     "hidden=" + string.Join(",", hidden) + "\n" +
                     "pois=" + (ShowPois ? "true" : "false") + "\n" +
                     "poiMinTier=" + PoiMinTier + "\n" +
-                    "zoom=" + Zoom + "\n" + sb);
+                    "zoomScale=" + ZoomSteps[Zoom].ToString(CultureInfo.InvariantCulture) + "\n" + sb);
             }
             catch (Exception ex)
             {
@@ -186,7 +205,7 @@ namespace WebMap
             }
         }
 
-        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":n,"sizes":{"poi":100,...}}
+        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":scale,"sizes":{"poi":100,...}}
         private static string ToJson()
         {
             StringBuilder sb = new StringBuilder("{\"follow\":");
@@ -201,7 +220,7 @@ namespace WebMap
             }
             sb.Append("],\"pois\":").Append(ShowPois ? "true" : "false");
             sb.Append(",\"poiMinTier\":").Append(PoiMinTier);
-            sb.Append(",\"zoom\":").Append(Zoom);
+            sb.Append(",\"zoom\":").Append(ZoomSteps[Zoom].ToString(CultureInfo.InvariantCulture));
             sb.Append(",\"sizes\":{");
             for (int i = 0; i < SizeKeys.Length; i++)
             {

@@ -106,9 +106,11 @@ namespace WebMap
             string request;
             while (WebHost.ViewRequests.TryDequeue(out request))
             {
-                int zoom;
+                double scale;
                 if (request.StartsWith("follow=")) CompanionSettings.SetFollow(request.Substring(7));
-                else if (request.StartsWith("zoom=") && int.TryParse(request.Substring(5), out zoom)) CompanionSettings.SetZoom(zoom);
+                else if (request.StartsWith("zoom=") && double.TryParse(request.Substring(5), System.Globalization.NumberStyles.Float,
+                             System.Globalization.CultureInfo.InvariantCulture, out scale) && scale > 0)
+                    CompanionSettings.SetZoom(CompanionSettings.NearestZoom(scale));
             }
 
             GameManager gm = GameManager.Instance;
@@ -352,7 +354,8 @@ namespace WebMap
             lastY = pos.y;
             lastZ = pos.z;
             lastYaw = yaw;
-            WebHost.PostPosition(pos.x, pos.y, pos.z, yaw);
+            // This frame's game time, so the page can space the movement evenly however unevenly it arrives
+            WebHost.PostPosition(pos.x, pos.y, pos.z, yaw, (long)(Time.unscaledTimeAsDouble * 1000.0));
         }
     }
 }

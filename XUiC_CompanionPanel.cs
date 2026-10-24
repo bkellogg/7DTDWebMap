@@ -43,8 +43,8 @@ namespace WebMap
             if (cbxZoom != null)
             {
                 cbxZoom.Elements.Clear();
-                for (int z = CompanionSettings.MinZoom; z <= CompanionSettings.MaxZoom; z++) cbxZoom.Elements.Add(CompanionSettings.ZoomName(z));
-                cbxZoom.OnValueChanged += (_sender, _old, _new) => CompanionSettings.SetZoom(CompanionSettings.MinZoom + cbxZoom.SelectedIndex);
+                for (int z = 0; z < CompanionSettings.ZoomSteps.Length; z++) cbxZoom.Elements.Add(CompanionSettings.ZoomName(z));
+                cbxZoom.OnValueChanged += (_sender, _old, _new) => CompanionSettings.SetZoom(cbxZoom.SelectedIndex);
             }
 
             cbxTier = GetChildById("cbxTier") as XUiC_ComboBoxList<string>;
@@ -193,7 +193,7 @@ namespace WebMap
             }
             if (togglePois != null) togglePois.Value = CompanionSettings.ShowPois;
             if (cbxTier != null) cbxTier.SelectedIndex = CompanionSettings.PoiMinTier;
-            if (cbxZoom != null) cbxZoom.SelectedIndex = CompanionSettings.Zoom - CompanionSettings.MinZoom;
+            if (cbxZoom != null) cbxZoom.SelectedIndex = CompanionSettings.Zoom;
             for (int i = 0; i < sizeBoxes.Length; i++)
             {
                 int step = System.Array.IndexOf(CompanionSettings.SizeSteps, CompanionSettings.GetSize(i));
