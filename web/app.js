@@ -776,6 +776,8 @@ function screenToWorld(sx, sy) {
   ];
 }
 
+const lastView = { x: NaN, z: NaN };  // view centre last frame, before snapping
+
 function draw() {
   drawQueued = false;
   // Same clock as the event handlers: the frame timestamp can be earlier than an event that
@@ -787,13 +789,19 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.width, H = canvas.height;
   if (!W || !H) return;
-  // Draw with the view snapped to whole pixels, so the map and the (pixel-aligned) POI labels move together
-  // instead of the labels hopping against the map as it slides
+  // WebGL slides the map and labels together by fractions of a pixel while moving, so movement is smooth, and
+  // settles on whole pixels when still, so labels are crisp. The canvas renderer can only place its cached
+  // layer and labels on whole pixels, so it always snaps (otherwise labels hop against the map).
+  const gl = renderer === 'webgl' && !glr.lost;
   const vx = view.x, vz = view.z, s = view.scale * dpr;
-  view.x = (W / 2 - Math.round(W / 2 - vx * s)) / s;
-  view.z = (Math.round(H / 2 + vz * s) - H / 2) / s;
+  const sliding = gl && (vx !== lastView.x || vz !== lastView.z);
+  lastView.x = vx; lastView.z = vz;
+  if (!sliding) {
+    view.x = (W / 2 - Math.round(W / 2 - vx * s)) / s;
+    view.z = (Math.round(H / 2 + vz * s) - H / 2) / s;
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (renderer === 'webgl' && !glr.lost) {
+  if (gl) {
     glr.draw(W, H, dpr);
     ctx.clearRect(0, 0, W, H);
   } else {
@@ -805,7 +813,7 @@ function draw() {
   view.z = vz;
 
   updateReadout();
-  if (moving) requestDraw();
+  if (moving || sliding) requestDraw();  // one more frame after a slide, to settle on whole pixels
   diagFrame(t, performance.now(), moving);
 }
 

@@ -78,7 +78,8 @@ function createGlRenderer(cv) {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     // Labels are stamped 1:1 at whole pixels, so no filtering
-    atlasTex = texture(gl.NEAREST, gl.CLAMP_TO_EDGE);
+    // Smooth sampling, so labels can slide by fractions of a pixel with the map; on whole pixels it's as crisp as nearest
+    atlasTex = texture(gl.LINEAR, gl.CLAMP_TO_EDGE);
     gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, ATLAS_W, ATLAS_H);
     resetAtlas();
     bgTex = null;
@@ -218,12 +219,13 @@ function createGlRenderer(cv) {
       quad(x0 - hl, y0 + hl, x0 + hl, y1 - hl, wu, wv, wu, wv);
       quad(x1 - hl, y0 + hl, x1 + hl, y1 - hl, wu, wv, wu, wv);
     }
-    const labelStart = n / 4;
+    // Labels keep their whole-pixel layout relative to the map and share its fraction-of-a-pixel offset
+    const labelStart = n / 4, fx = ox - Math.round(ox), fy = oy - Math.round(oy);
     for (const e of visible) {
       if (e.ly === null) continue;
       const slot = labelSlot(e.p, dpr);
       if (!slot) continue;
-      const x = Math.round(e.x0 + ox) - slot.pad, y = Math.round(e.ly + oy - slot.h / 2);
+      const x = Math.round(e.x0 + ox - fx) + fx - slot.pad, y = Math.round(e.ly + oy - fy - slot.h / 2) + fy;
       quad(x, y, x + slot.w, y + slot.h, slot.x / ATLAS_W, slot.y / ATLAS_H,
         (slot.x + slot.w) / ATLAS_W, (slot.y + slot.h) / ATLAS_H);
     }
