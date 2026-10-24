@@ -9,8 +9,7 @@ const workstations = new Map();  // id -> { d: snapshot, at: performance.now() w
 let wsNote = '';
 const WS_TYPES = ['campfire', 'forge', 'workbench', 'combineStation', 'cementMixer', 'chemistryStation', 'tableSaw'];
 const wsEl = document.getElementById('ws');
-const wsList = document.getElementById('ws-list');
-const wsCount = document.getElementById('ws-count');
+const wsList = document.getElementById('ws');
 let wsShown = null;
 
 function wsApply(batch) {
@@ -28,8 +27,7 @@ function wsClear() {
   wsRender();
 }
 
-// The sidebar takes space from the map rather than covering it, so the followed player stays centred.
-// It sits on the edge chosen in the panel (ws-left, ws-right, ws-top or ws-bottom on the body).
+// The cards float over the map along the edge chosen in the panel (ws-left, ws-right, ws-top or ws-bottom on the body)
 let wsSide = '';
 function wsUpdateVisibility() {
   const show = !!(settings.ws && settings.ws.show);
@@ -40,7 +38,6 @@ function wsUpdateVisibility() {
   wsShown = show;
   wsSide = side;
   document.body.classList.toggle('ws-on', show);
-  resize();
   wsRender();
 }
 
@@ -135,7 +132,6 @@ function wsRender() {
   // Working ones first, then by name, then a fixed order so cards don't swap places
   rows.sort((a, b) => (b.p.active - a.p.active) || a.w.d.name.localeCompare(b.w.d.name) || a.w.d.id.localeCompare(b.w.d.id));
 
-  wsCount.textContent = rows.length + (rows.length === workstations.size ? '' : ' of ' + workstations.size);
   wsList.textContent = '';
   if (!rows.length) {
     wsList.appendChild(wsEl2('p', 'ws-empty', wsNote ||
@@ -146,17 +142,20 @@ function wsRender() {
   for (const { w, p } of rows) wsList.appendChild(wsCard(w.d, p));
 }
 
+// Two lines at most: station, distance and status; then the current craft (or fuel / what's waiting) with its
+// time. The rest (queue, when it's all done, estimates) is in the tooltip.
 function wsCard(d, p) {
   const card = wsEl2('div', 'ws-card' + (p.active ? ' active' : ''));
-  card.title = 'Show on the map';
   card.addEventListener('click', () => wsShowOnMap(d));
 
   const head = wsEl2('div', 'ws-head');
-  head.appendChild(wsIcon(d.icon, 'ws-icon'));
-  const title = wsEl2('div', 'ws-title');
-  title.appendChild(wsEl2('div', 'ws-name', d.name));
-  title.appendChild(wsEl2('div', 'ws-where', wsWhere(d)));
-  head.appendChild(title);
+  const iconBox = wsEl2('div', 'ws-iconbox');
+  iconBox.appendChild(wsIcon(d.icon, 'ws-icon'));
+  if (p.out > 0) iconBox.appendChild(wsEl2('span', 'ws-out', p.out > 999 ? '999+' : String(p.out)));
+  head.appendChild(iconBox);
+  const name = wsEl2('div', 'ws-name', d.name);
+  name.appendChild(wsEl2('span', 'ws-where', wsWhere(d)));
+  head.appendChild(name);
   let status, cls;
   if (d.paused && p.queue.length) { status = 'In use'; cls = 'paused'; }
   else if (p.working) { status = 'Working'; cls = 'working'; }
@@ -164,47 +163,36 @@ function wsCard(d, p) {
   else if (p.burning) { status = 'Burning'; cls = 'working'; }
   else if (p.out > 0) { status = 'Done'; cls = 'done'; }
   else { status = 'Idle'; cls = 'idle'; }
-  head.appendChild(wsEl2('span', 'ws-badge ' + cls, status));
+  head.appendChild(wsEl2('span', 'ws-status ' + cls, (d.live ? '' : '~') + status));
   card.appendChild(head);
 
+  const tip = [d.name + (wsWhere(d) ? ' (' + wsWhere(d) + ')' : '') + ': ' + status];
   if (p.queue.length) {
     const cur = p.queue[0];
-    const row = wsEl2('div', 'ws-craft');
-    row.appendChild(wsIcon(cur.icon, 'ws-item'));
-    const info = wsEl2('div', 'ws-craft-info');
-    const line = wsEl2('div', 'ws-craft-line');
+    const line = wsEl2('div', 'ws-line');
+    line.appendChild(wsIcon(cur.icon, 'ws-item'));
     line.appendChild(wsEl2('span', 'ws-craft-name', cur.name + (cur.count > 1 ? ' ×' + cur.count : '')));
-    line.appendChild(wsEl2('span', 'ws-craft-time', wsTime(cur.left)));
-    info.appendChild(line);
+    if (p.queue.length > 1) line.appendChild(wsEl2('span', 'ws-more', '+' + (p.queue.length - 1)));
+    line.appendChild(wsEl2('span', 'ws-time', wsTime(cur.left)));
+    card.appendChild(line);
     const bar = wsEl2('div', 'ws-bar');
     const fill = wsEl2('div', 'ws-fill');
     fill.style.width = (cur.each > 0 ? Math.max(0, Math.min(1, 1 - cur.left / cur.each)) * 100 : 0) + '%';
     bar.appendChild(fill);
-    info.appendChild(bar);
-    row.appendChild(info);
-    card.appendChild(row);
-    if (p.queue.length > 1) {
-      const next = wsEl2('div', 'ws-queue');
-      for (const it of p.queue.slice(1)) {
-        const chip = wsEl2('span', 'ws-chip');
-        chip.title = it.name;
-        chip.appendChild(wsIcon(it.icon, 'ws-chip-icon'));
-        chip.appendChild(document.createTextNode('×' + it.count));
-        next.appendChild(chip);
-      }
-      card.appendChild(next);
-    }
+    card.appendChild(bar);
+    for (const it of p.queue) tip.push('  ' + it.name + ' ×' + it.count);
+    tip.push('All done in ' + wsTime(p.total));
+  } else {
+    const facts = [];
+    if (d.usesFuel && (p.burning || p.fuelLeft > 0)) facts.push('Fuel ' + wsTime(p.fuelLeft));
+    if (p.out > 0) facts.push(p.out + ' to collect');
+    if (facts.length) card.appendChild(wsEl2('div', 'ws-line', facts.join(' · ')));
   }
-
-  const facts = [];
-  if (p.queue.length) facts.push('All done in ' + wsTime(p.total));
-  if (d.usesFuel && (p.burning || p.fuelLeft > 0)) facts.push('Fuel ' + wsTime(p.fuelLeft));
-  if (p.out > 0) facts.push(p.out + ' to collect');
-  if (facts.length) card.appendChild(wsEl2('div', 'ws-facts', facts.join(' · ')));
-  if (!d.live) {
-    const est = wsEl2('div', 'ws-est', 'Estimated: too far away for the game to update it');
-    card.appendChild(est);
-  }
+  if (p.queue.length && d.usesFuel && (p.burning || p.fuelLeft > 0)) tip.push('Fuel ' + wsTime(p.fuelLeft));
+  if (p.out > 0) tip.push(p.out + ' to collect');
+  if (!d.live) tip.push('~ Estimated: too far away for the game to update it');
+  tip.push('Click to show on the map');
+  card.title = tip.join('\n');
   return card;
 }
 
