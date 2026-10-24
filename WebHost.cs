@@ -23,6 +23,7 @@ namespace WebMap
         private const byte KindNavRemove = 7;
         private const byte KindView = 8;
         private const byte KindPois = 9;
+        private const byte KindWorkstations = 10;
 
         private struct Msg
         {
@@ -34,6 +35,7 @@ namespace WebMap
             public int Color, Layer, Entity;
             public bool Flag;
             public List<PoiInfo> Pois;
+            public List<string> Set, Del;
             public long Stamp;
             public long GameMs;
         }
@@ -83,6 +85,14 @@ namespace WebMap
         private static readonly Dictionary<int, string> navs = new Dictionary<int, string>();
         private static readonly List<string> navSet = new List<string>();
         private static readonly List<int> navDel = new List<int>();
+
+        // Workstations by id, as JSON (WorkstationTracker.Snapshot): written by the pusher thread, read when a browser
+        // connects. wsNote says why there are none, when it's not just that there aren't any.
+        private static readonly Dictionary<string, string> workstations = new Dictionary<string, string>();
+        private static string wsNote = "";
+
+        // Folders the page's item icons come from: the game's, then each mod's (set on the main thread at startup)
+        private static readonly List<string> itemIconDirs = new List<string>();
 
         // Page settings (CompanionSettings) and the world's POIs, as JSON
         private static string viewJson;
@@ -226,6 +236,22 @@ namespace WebMap
             wake.Set();
         }
 
+        // A batch from the server; full replaces everything. The lists are copied, so callers can reuse theirs.
+        public static void PostWorkstations(bool _full, List<string> _set, List<string> _del, string _note = "")
+        {
+            inbox.Enqueue(new Msg { Kind = KindWorkstations, Flag = _full, Set = new List<string>(_set), Del = new List<string>(_del), Text = _note });
+            wake.Set();
+        }
+
+        public static void SetItemIconDirs(List<string> _dirs)
+        {
+            lock (itemIconDirs)
+            {
+                itemIconDirs.Clear();
+                itemIconDirs.AddRange(_dirs);
+            }
+        }
+
         public static void PostReset()
         {
             inbox.Enqueue(new Msg { Kind = KindReset });
@@ -305,6 +331,9 @@ namespace WebMap
                         poisVersion++;
                         Broadcast(SseEvent("pois", "{\"v\":" + poisVersion + "}"));
                         break;
+                    case KindWorkstations:
+                        Broadcast(SseEvent("ws", ApplyWorkstations(m)));
+                        break;
                     case KindReset:
                         int e;
                         lock (mirrorLock)
@@ -316,6 +345,8 @@ namespace WebMap
                         lock (navLock)
                         {
                             navs.Clear();
+                            workstations.Clear();
+                            wsNote = "";
                         }
                         navSet.Clear();
                         navDel.Clear();
@@ -341,6 +372,44 @@ namespace WebMap
                 navSet.Clear();
                 navDel.Clear();
             }
+        }
+
+        // {"full":bool,"note":"...","set":[snapshot,...],"del":[id,...]}
+        private static string ApplyWorkstations(Msg _m)
+        {
+            lock (navLock)
+            {
+                if (_m.Flag) workstations.Clear();
+                foreach (string json in _m.Set)
+                {
+                    // "id" is always the first field: {"id":"x,y,z",...
+                    int end = json.IndexOf('"', 7);
+                    if (json.StartsWith("{\"id\":\"") && end > 7) workstations[json.Substring(7, end - 7)] = json;
+                }
+                foreach (string id in _m.Del) workstations.Remove(id);
+                wsNote = _m.Text ?? "";
+            }
+            return WorkstationBatchJson(_m.Flag, _m.Set, _m.Del);
+        }
+
+        private static string WorkstationBatchJson(bool _full, ICollection<string> _set, List<string> _del)
+        {
+            StringBuilder sb = new StringBuilder("{\"full\":").Append(_full ? "true" : "false");
+            sb.Append(",\"note\":").Append(JsonString(wsNote)).Append(",\"set\":[");
+            bool first = true;
+            foreach (string json in _set)
+            {
+                if (!first) sb.Append(',');
+                sb.Append(json);
+                first = false;
+            }
+            sb.Append("],\"del\":[");
+            for (int i = 0; i < _del.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(JsonString(_del[i]));
+            }
+            return sb.Append("]}").ToString();
         }
 
         // k key, x/z world position, r rotation, s sprite, l label, c color #rrggbbaa, sx/sy icon scale,
@@ -595,6 +664,11 @@ namespace WebMap
                 Finish(res, 204, "text/plain", new byte[0]);
                 return;
             }
+            if (path.StartsWith("/itemicons/"))
+            {
+                ServeItemIcon(path.Substring(11), res);
+                return;
+            }
             if (path == "/diag")
             {
                 // The page reports position stalls here so they land in the game log
@@ -629,6 +703,7 @@ namespace WebMap
             lock (navLock)
             {
                 hello.Append(SseEvent("navs", NavBatchJson(true, navs.Values, new List<int>())));
+                hello.Append(SseEvent("ws", WorkstationBatchJson(true, workstations.Values, new List<string>())));
             }
             string view = viewJson;
             if (view != null) hello.Append(SseEvent("view", view));
@@ -711,6 +786,38 @@ namespace WebMap
             Finish(_res, 200, ContentType(name), File.ReadAllBytes(file));
         }
 
+        // An item's icon from the game's (or a mod's) ItemIcons folder, by icon name
+        private static void ServeItemIcon(string _name, HttpListenerResponse _res)
+        {
+            if (_name.EndsWith(".png")) _name = _name.Substring(0, _name.Length - 4);
+            foreach (char c in _name)
+            {
+                if (!(char.IsLetterOrDigit(c) || c == '-' || c == '_'))
+                {
+                    Finish(_res, 404, "text/plain", Encoding.UTF8.GetBytes("Not found"));
+                    return;
+                }
+            }
+            string file = null;
+            lock (itemIconDirs)
+            {
+                foreach (string dir in itemIconDirs)
+                {
+                    string f = Path.Combine(dir, _name + ".png");
+                    if (!File.Exists(f)) continue;
+                    file = f;
+                    break;
+                }
+            }
+            if (file == null || _name.Length == 0)
+            {
+                Finish(_res, 404, "text/plain", Encoding.UTF8.GetBytes("Not found"));
+                return;
+            }
+            _res.Headers["Cache-Control"] = "max-age=3600";
+            Finish(_res, 200, "image/png", File.ReadAllBytes(file));
+        }
+
         private static string ContentType(string _name)
         {
             string ext = Path.GetExtension(_name).ToLowerInvariant();
@@ -729,7 +836,7 @@ namespace WebMap
         {
             _res.StatusCode = _status;
             _res.ContentType = _contentType;
-            _res.Headers["Cache-Control"] = "no-cache";
+            if (_res.Headers["Cache-Control"] == null) _res.Headers["Cache-Control"] = "no-cache";
             _res.ContentLength64 = _body.Length;
             _res.OutputStream.Write(_body, 0, _body.Length);
             _res.Close();

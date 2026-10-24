@@ -529,6 +529,7 @@ function connect() {
     track.length = 0;
     navs.clear();
     navOrder = [];
+    wsClear();
     pois = [];
     layer.valid = false;
     centeredOnce = false;
@@ -543,7 +544,10 @@ function connect() {
     follow = settings.follow !== 'free';
     updateFollowButton();
     invalidateLayer();
+    wsUpdateVisibility();
+    wsRender();
   });
+  es.addEventListener('ws', (ev) => wsApply(JSON.parse(ev.data)));
   es.addEventListener('pois', () => loadPois());
   es.addEventListener('world', (ev) => { world = JSON.parse(ev.data); updateOverlay(); requestDraw(); });
   es.addEventListener('pos', (ev) => {
@@ -588,6 +592,7 @@ function addSample(p, now) {
     track.length = 0;
     track.push(s);
     player = { x: s.x, y: s.y, z: s.z, yaw: s.yaw };
+    wsRender();  // distances to workstations
     clockOffset = offsetTarget = now - gt;
     offsets.length = 0;
     return;

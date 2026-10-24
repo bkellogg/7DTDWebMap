@@ -37,6 +37,12 @@ namespace WebMap
         // Index into ZoomSteps
         public static int Zoom { get; private set; } = DefaultZoom;
 
+        // Workstations sidebar: shown at all, only active ones, and which types (WorkstationTracker.Types plus "other") are hidden
+        public static bool ShowWorkstations { get; private set; } = true;
+        public static bool WorkstationsActiveOnly { get; private set; }
+        public const string OtherWorkstation = "other";
+        private static readonly HashSet<string> hiddenWorkstations = new HashSet<string>();
+
         // Bumped on every change, so the panel knows to refresh
         public static int Version { get; private set; }
 
@@ -69,6 +75,32 @@ namespace WebMap
         {
             if (Array.IndexOf(Categories, _category) < 0) return;
             if (_hide ? !hidden.Add(_category) : !hidden.Remove(_category)) return;
+            Changed(true);
+        }
+
+        public static bool IsWorkstationHidden(string _type)
+        {
+            return hiddenWorkstations.Contains(_type);
+        }
+
+        public static void SetShowWorkstations(bool _show)
+        {
+            if (_show == ShowWorkstations) return;
+            ShowWorkstations = _show;
+            Changed(true);
+        }
+
+        public static void SetWorkstationsActiveOnly(bool _activeOnly)
+        {
+            if (_activeOnly == WorkstationsActiveOnly) return;
+            WorkstationsActiveOnly = _activeOnly;
+            Changed(true);
+        }
+
+        public static void SetWorkstationHidden(string _type, bool _hide)
+        {
+            if (_type != OtherWorkstation && Array.IndexOf(WorkstationTracker.Types, _type) < 0) return;
+            if (_hide ? !hiddenWorkstations.Add(_type) : !hiddenWorkstations.Remove(_type)) return;
             Changed(true);
         }
 
@@ -160,6 +192,15 @@ namespace WebMap
                             }
                         }
                         else if (key == "pois") ShowPois = value != "false";
+                        else if (key == "workstations") ShowWorkstations = value != "false";
+                        else if (key == "workstationsActiveOnly") WorkstationsActiveOnly = value == "true";
+                        else if (key == "workstationsHidden")
+                        {
+                            foreach (string t in value.Split(','))
+                            {
+                                if (t == OtherWorkstation || Array.IndexOf(WorkstationTracker.Types, t) >= 0) hiddenWorkstations.Add(t);
+                            }
+                        }
                         else if (key == "poiMinTier" && int.TryParse(value, out n)) PoiMinTier = Math.Max(0, Math.Min(MaxTier, n));
                         else if (key == "zoomScale" && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out scale) && scale > 0) Zoom = NearestZoom(scale);
                         // Older settings saved zoom as a power of two
@@ -197,6 +238,9 @@ namespace WebMap
                     "hidden=" + string.Join(",", hidden) + "\n" +
                     "pois=" + (ShowPois ? "true" : "false") + "\n" +
                     "poiMinTier=" + PoiMinTier + "\n" +
+                    "workstations=" + (ShowWorkstations ? "true" : "false") + "\n" +
+                    "workstationsActiveOnly=" + (WorkstationsActiveOnly ? "true" : "false") + "\n" +
+                    "workstationsHidden=" + string.Join(",", hiddenWorkstations) + "\n" +
                     "zoomScale=" + ZoomSteps[Zoom].ToString(CultureInfo.InvariantCulture) + "\n" + sb);
             }
             catch (Exception ex)
@@ -205,7 +249,8 @@ namespace WebMap
             }
         }
 
-        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":scale,"sizes":{"poi":100,...}}
+        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":scale,"sizes":{"poi":100,...},
+        //  "ws":{"show":bool,"active":bool,"hide":[type,...]}}
         private static string ToJson()
         {
             StringBuilder sb = new StringBuilder("{\"follow\":");
@@ -227,7 +272,16 @@ namespace WebMap
                 if (i > 0) sb.Append(',');
                 sb.Append('"').Append(SizeKeys[i]).Append("\":").Append(sizes[i]);
             }
-            sb.Append("}}");
+            sb.Append("},\"ws\":{\"show\":").Append(ShowWorkstations ? "true" : "false");
+            sb.Append(",\"active\":").Append(WorkstationsActiveOnly ? "true" : "false").Append(",\"hide\":[");
+            first = true;
+            foreach (string t in hiddenWorkstations)
+            {
+                if (!first) sb.Append(',');
+                sb.Append('"').Append(t).Append('"');
+                first = false;
+            }
+            sb.Append("]}}");
             return sb.ToString();
         }
     }

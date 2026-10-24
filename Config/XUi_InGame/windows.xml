@@ -46,7 +46,23 @@
 					<combobox depth="2" name="size_icons" type="ComboBoxList`1[System.String]" value_wrap="false" pos="190,-172" width="154" height="30" />
 				</rect>
 
-				<simplebutton depth="3" name="btnAdvanced" pos="12,-496" width="330" height="34" font_size="24" caption="Text &amp; icon sizes" />
+				<rect name="pageWorkstations" depth="1" pos="0,0" width="354" height="490" visible="false">
+					<label depth="1" pos="14,-12" width="330" height="28" text="Workstations sidebar" font_size="24" color="222,206,163,255" />
+					<togglebutton depth="2" name="ws_show" pos="12,-44" width="330" height="32" font_size="24" caption="Show the sidebar" />
+					<togglebutton depth="2" name="ws_active" pos="12,-80" width="330" height="32" font_size="24" caption="Only ones that are working" />
+					<label depth="1" pos="14,-124" width="330" height="28" text="Types" font_size="24" color="222,206,163,255" />
+					<togglebutton depth="2" name="ws_type_campfire" pos="12,-156" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_forge" pos="12,-192" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_workbench" pos="12,-228" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_combineStation" pos="12,-264" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_cementMixer" pos="12,-300" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_chemistryStation" pos="12,-336" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_tableSaw" pos="12,-372" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="ws_type_other" pos="12,-408" width="330" height="32" font_size="24" />
+				</rect>
+
+				<simplebutton depth="3" name="btnWorkstations" pos="12,-496" width="161" height="34" font_size="22" caption="Workstations" />
+				<simplebutton depth="3" name="btnAdvanced" pos="181,-496" width="161" height="34" font_size="22" caption="Text &amp; icon sizes" />
 				<label depth="1" name="status" pos="14,-540" width="330" height="28" text="" font_size="22" />
 			</rect>
 		</window>

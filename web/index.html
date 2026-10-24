@@ -8,13 +8,14 @@
 </head>
 <body>
 <header>
-  <nav>
-    <button class="tab active" data-tab="map">Map</button>
-    <button class="tab" data-tab="workstations" disabled title="Coming in a later milestone">Workstations</button>
-  </nav>
+  <div class="title">7DTD Web Map</div>
   <div id="status" class="status off">Connecting…</div>
 </header>
 <main>
+  <aside id="ws">
+    <div class="ws-header">Workstations <span id="ws-count"></span></div>
+    <div id="ws-list"></div>
+  </aside>
   <section id="tab-map" class="panel active">
     <canvas id="mapgl"></canvas>
     <canvas id="map"></canvas>
@@ -33,6 +34,7 @@
   </section>
 </main>
 <script src="gl.js"></script>
+<script src="ws.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

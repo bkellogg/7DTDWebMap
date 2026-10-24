@@ -73,6 +73,9 @@
         <Compile Include="WebHost.cs"/>
         <Compile Include="CompanionSettings.cs"/>
         <Compile Include="XUiC_CompanionPanel.cs"/>
+        <Compile Include="WorkstationTracker.cs"/>
+        <Compile Include="WorkstationClient.cs"/>
+        <Compile Include="NetPackages.cs"/>
     </ItemGroup>
     <ItemGroup>
         <None Include="ModInfo.xml"/>

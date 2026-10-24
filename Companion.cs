@@ -59,6 +59,10 @@ namespace WebMap
 
         public static void Tick()
         {
+            // Turns the server's workstation updates on or off as browsers come and go; nothing to do when neither changed
+            GameManager gm = GameManager.Instance;
+            WorkstationClient.Tick(gm != null && gm.World != null && gm.gameStateManager != null && gm.gameStateManager.IsGameStarted());
+
             // Idle: no browser connected, nothing to do
             if (WebHost.ClientCount == 0) return;
 
@@ -90,6 +94,7 @@ namespace WebMap
             MapPatches.Watched = null;
             MapPatches.ClearDirty();
             NavMirror.Clear();
+            WorkstationClient.Reset();
             CompanionSettings.ResetFollow();
             sync = SyncState.None;
             poisPosted = false;
