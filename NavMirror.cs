@@ -23,6 +23,8 @@ namespace WebMap
         private static bool loggedError;
 
         // Forget what was sent, so everything is posted again (after WebHost cleared its copy)
+        private static readonly HashSet<NavObject> vehicleWaypoints = new HashSet<NavObject>();
+
         public static void Clear()
         {
             snaps.Clear();
@@ -34,6 +36,18 @@ namespace WebMap
             if (mgr == null) return;
 
             foreach (Snap s in snaps.Values) s.Seen = false;
+
+            // The game keeps a "last known position" waypoint for each vehicle you own; those belong with vehicles
+            vehicleWaypoints.Clear();
+            List<Waypoint> waypoints = _player.Waypoints != null ? _player.Waypoints.Collection.list : null;
+            if (waypoints != null)
+            {
+                for (int i = 0; i < waypoints.Count; i++)
+                {
+                    Waypoint w = waypoints[i];
+                    if (w.navObject != null && w.lastKnownPositionEntityType == eLastKnownPositionEntityType.Vehicle) vehicleWaypoints.Add(w.navObject);
+                }
+            }
 
             List<NavObject> list = mgr.NavObjectList;
             for (int i = 0; i < list.Count; i++)
@@ -123,6 +137,7 @@ namespace WebMap
         public static string CategoryOf(NavObject _nav)
         {
             if (_nav.TrackedEntity is EntityPlayer) return "players";
+            if (vehicleWaypoints.Contains(_nav)) return "vehicles";
             string name = _nav.NavObjectClass != null ? _nav.NavObjectClass.NavObjectClassName : "";
             switch (name)
             {
