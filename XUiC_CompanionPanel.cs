@@ -30,6 +30,7 @@ namespace WebMap
         private XUiView pageAdvanced;
         private XUiC_SimpleButton btnWorkstations;
         private XUiC_SimpleButton btnAdvanced;
+        private Vector2i advancedPos;  // its place in windows.xml; as Back it moves to where Workstations is
         private int page;
 
         // Workstation types with a toggle (ws_type_<type> in windows.xml)
@@ -118,6 +119,7 @@ namespace WebMap
             if (btnWorkstations != null) btnWorkstations.OnPressed += (_sender, _button) => ShowPage(page == PageWorkstations ? PageBasic : PageWorkstations);
             btnAdvanced = GetChildById("btnAdvanced") as XUiC_SimpleButton;
             if (btnAdvanced != null) btnAdvanced.OnPressed += (_sender, _button) => ShowPage(page == PageAdvanced ? PageBasic : PageAdvanced);
+            if (btnAdvanced != null) advancedPos = btnAdvanced.ViewComponent.Position;
 
             XUiController status = GetChildById("status");
             lblStatus = status != null ? status.ViewComponent as XUiV_Label : null;
@@ -143,8 +145,20 @@ namespace WebMap
             if (pageBasic != null) pageBasic.IsVisible = _page == PageBasic;
             if (pageWorkstations != null) pageWorkstations.IsVisible = _page == PageWorkstations;
             if (pageAdvanced != null) pageAdvanced.IsVisible = _page == PageAdvanced;
-            if (btnWorkstations != null) btnWorkstations.Text = _page == PageWorkstations ? "Back" : "Workstations";
-            if (btnAdvanced != null) btnAdvanced.Text = _page == PageAdvanced ? "Back" : "Text & icon sizes";
+            // On a sub-page only its Back button shows, always on the left
+            if (btnWorkstations != null)
+            {
+                btnWorkstations.Text = _page == PageWorkstations ? "Back" : "Workstations";
+                btnWorkstations.ViewComponent.IsVisible = _page != PageAdvanced;
+            }
+            if (btnAdvanced != null)
+            {
+                btnAdvanced.Text = _page == PageAdvanced ? "Back" : "Text & icon sizes";
+                btnAdvanced.ViewComponent.IsVisible = _page != PageWorkstations;
+                btnAdvanced.ViewComponent.Position = _page == PageAdvanced && btnWorkstations != null
+                    ? btnWorkstations.ViewComponent.Position
+                    : advancedPos;
+            }
         }
 
         public override void Update(float _dt)
