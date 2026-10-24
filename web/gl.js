@@ -3,8 +3,8 @@
 // WebGL renderer for the static part of the map: background, explored map and POI outlines/labels.
 // Map tiles live on the GPU as textures, so newly explored chunks are a small texture update and nothing
 // is redrawn from scratch. POI labels are drawn once each into an atlas texture and stamped as quads.
-// Markers and the player arrow stay on the 2D canvas on top. G on the page switches renderers.
-// Uses app.js globals (tiles, view, layer, worldToScreen, layoutPois...) at call time.
+// Markers and the player arrow stay on the 2D canvas on top.
+// Uses app.js globals (tiles, view, poiLayout, worldToScreen, layoutPois...) at call time.
 
 const GL_VS = `#version 300 es
 in vec2 a_pos;
@@ -168,12 +168,11 @@ function createGlRenderer(cv) {
     paint = null;
     r.layoutScale = view.scale;
     r.layoutDpr = dpr;
-    layer.valid = true;
+    poiLayout.valid = true;
   }
 
   r.draw = function (W, H, dpr) {
-    if (!layer.valid || r.layoutScale !== view.scale || r.layoutDpr !== dpr || atlasFull) relayout(dpr);
-    pendingPatch.clear();
+    if (!poiLayout.valid || r.layoutScale !== view.scale || r.layoutDpr !== dpr || atlasFull) relayout(dpr);
     gl.viewport(0, 0, W, H);
     gl.clearColor(0x7d / 255, 0x7d / 255, 0x7d / 255, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);

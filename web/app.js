@@ -6,7 +6,7 @@ const TILE_PX = TILE_CHUNKS * 16;
 const CHUNK_BYTES = 8 + 512;
 
 const canvas = document.getElementById('map');
-const glCanvas = document.getElementById('mapgl');  // under the 2D canvas, used by the WebGL renderer
+const glCanvas = document.getElementById('mapgl');  // the map itself (gl.js), under the 2D canvas
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const readoutEl = document.getElementById('readout');
@@ -15,15 +15,13 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayText = document.getElementById('overlay-text');
 
-const tiles = new Map();  // "rx,rz" -> { rx, rz, canvas, ctx, img, dirty }
+const tiles = new Map();  // "rx,rz" -> { rx, rz, img, tex, glDirty }; gl.js uploads img as a texture
 
-// Static layer: background, explored map and POI labels, drawn once into a canvas twice the screen size and
-// slid around each frame. Redrawing all of that every frame cost Chrome half its frame rate. Rebuilt on zoom,
-// resize, settings changes or when the view nears its edge; newly explored chunks only patch their area.
-const layer = { canvas: document.createElement('canvas'), x: 0, z: 0, scale: 0, dpr: 0, valid: false, labels: [] };
-layer.ctx = layer.canvas.getContext('2d');
-const pendingPatch = new Set(); // chunk keys redrawn since the layer was last updated
-let paint = null;               // while drawing the layer: { x, z, w, h } stands in for the view center and canvas size
+// The map (background, explored tiles, POI outlines and labels) is drawn with WebGL (gl.js); markers and the
+// player arrow go on the 2D canvas on top. False when the POI layout must be redone: zoom, settings, markers
+// or newly explored POIs changed.
+const poiLayout = { valid: false };
+let paint = null;  // while laying out POIs: { x, z, w, h } stands in for the view center and canvas size
 const chunks = new Map(); // "cx,cz" -> Uint16Array(256) RGB555 colors, kept so edges can be redrawn when neighbors arrive
 let epoch = 0, seq = 0;          // what we have
 let wantEpoch = 0, wantSeq = 0;  // what the game says exists
@@ -68,8 +66,7 @@ let pois = [];
 const SKULL = 'ui_game_symbol_skull', SKULL_COLOR = '#ff0000';  // the game's [red] difficulty skulls
 let poiKeys = new Set(); // center chunks of all POIs, to spot a newly explored one
 let centeredOnce = false;
-let renderer = 'canvas';  // 'canvas' or 'webgl' (G switches)
-let glr = null;           // WebGL renderer, see gl.js
+let glr = null;  // WebGL renderer, see gl.js; null if the browser has no WebGL 2
 let mouse = null;   // last mouse position over the canvas, for the readout
 
 // ---- In-game map look ----
@@ -77,7 +74,6 @@ let mouse = null;   // last mouse position over the canvas, for the readout
 // Fog-of-war edge masks, same as XUiC_MapArea.initFOWChunkMaskColors: a 64x64 sheet of 16x16 alpha masks.
 // The game reads it bottom-up (Unity texture rows), the PNG is top-down, hence the 63 - k.
 let fowMasks = null;
-let bgPattern = null;
 let bgImage = null;
 
 function loadImage(src) {
@@ -116,14 +112,13 @@ async function loadLook() {
     }
     fowMasks = masks;
     for (const key of chunks.keys()) renderChunkKey(key);
-    layer.valid = false;
+    poiLayout.valid = false;
   } catch (err) {
     console.warn('fog mask not loaded, using hard edges', err);
   }
   try {
     bgImage = await loadImage('map_background.png');
-    bgPattern = layer.ctx.createPattern(bgImage, 'repeat');
-    layer.valid = false;
+    poiLayout.valid = false;
   } catch (err) {
     console.warn('map background not loaded', err);
   }
@@ -165,7 +160,7 @@ function applyNavs(d) {
   }
   for (const k of d.del) navs.delete(k);
   // POI labels dodge markers; re-lay them out when markers come or go (not when they move)
-  if (d.full || d.del.length || navOrder.length !== navs.size) layer.valid = false;
+  if (d.full || d.del.length || navOrder.length !== navs.size) poiLayout.valid = false;
   navOrder = Array.from(navs.values()).sort((a, b) => a.layer - b.layer);
   requestDraw();
 }
@@ -192,7 +187,7 @@ function iconFor(sprite, color) {
   if (!icons.has(sprite)) {
     icons.set(sprite, null);
     const img = new Image();
-    img.onload = () => { icons.set(sprite, img); if (sprite === SKULL) layer.valid = false; requestDraw(); };
+    img.onload = () => { icons.set(sprite, img); if (sprite === SKULL) poiLayout.valid = false; requestDraw(); };
     img.src = 'icons/' + encodeURIComponent(sprite) + '.png';
   }
   const img = icons.get(sprite);
@@ -271,7 +266,7 @@ async function loadPois() {
     // Higher tiers win when labels collide
     pois.sort((a, b) => b.tier - a.tier);
     poiKeys = new Set(pois.map((q) => q.key));
-    invalidateLayer();
+    invalidateLayout();
   } catch (err) {
     console.warn('POI list not loaded', err);
   }
@@ -307,12 +302,6 @@ function setPoiFont(g, dpr) {
   g.font = '600 ' + (12 * dpr * sizeOf('poi')) + 'px system-ui, "Segoe UI", sans-serif';
   g.textAlign = 'left';
   g.textBaseline = 'middle';
-}
-
-// Lays out the POI outlines and labels in layer coordinates and draws them
-function drawPois(g, W, H, dpr) {
-  layer.labels = layoutPois(g, 0, 0, W, H, dpr);
-  for (const e of layer.labels) drawPoi(g, e, dpr);
 }
 
 // Where each POI's outline and label go, for POIs inside the given box (in worldToScreen coordinates)
@@ -352,27 +341,6 @@ function layoutPois(g, bx0, by0, bx1, by1, dpr) {
     entries.push(e);
   }
   return entries;
-}
-
-function drawPoi(g, e, dpr) {
-  if (e.outline) {
-    g.strokeStyle = 'rgba(255,255,255,.22)';
-    g.lineWidth = 1 * dpr;
-    g.strokeRect(e.x - e.hw, e.y - e.hh, e.hw * 2, e.hh * 2);
-  }
-  if (e.ly === null) return;
-  const p = e.p;
-  g.lineWidth = 3 * dpr;
-  g.strokeStyle = 'rgba(0,0,0,.75)';
-  g.strokeText(p.name, e.x0, e.ly);
-  g.fillStyle = '#f3ead2';
-  g.fillText(p.name, e.x0, e.ly);
-  const skullIcon = iconFor(SKULL, SKULL_COLOR);
-  if (p.tier && skullIcon) {
-    for (let i = 0; i < p.tier; i++) {
-      g.drawImage(skullIcon, e.x0 + p.tw + 3 * dpr + i * e.skull, e.ly - e.skull / 2, e.skull, e.skull);
-    }
-  }
 }
 
 // ---- Follow target ----
@@ -419,10 +387,7 @@ function tileFor(cx, cz) {
   const key = rx + ',' + rz;
   let t = tiles.get(key);
   if (!t) {
-    const c = document.createElement('canvas');
-    c.width = c.height = TILE_PX;
-    const tctx = c.getContext('2d');
-    t = { rx, rz, canvas: c, ctx: tctx, img: tctx.createImageData(TILE_PX, TILE_PX), dirty: false };
+    t = { rx, rz, img: new ImageData(TILE_PX, TILE_PX), tex: null, glDirty: false };
     tiles.set(key, t);
   }
   return t;
@@ -463,7 +428,6 @@ function renderChunk(cx, cz, colors) {
     data[i + 2] = (c & 31) / 31 * 255;
     data[i + 3] = mask ? mask[j] : 255;
   }
-  t.dirty = true;
   t.glDirty = true;
 }
 
@@ -471,7 +435,7 @@ function clearMap() {
   if (glr) glr.forgetTiles();
   tiles.clear();
   chunks.clear();
-  layer.valid = false;
+  poiLayout.valid = false;
   seq = 0;
 }
 
@@ -487,9 +451,9 @@ async function pull() {
       if (e !== epoch) { clearMap(); epoch = e; }
       const touched = new Set(), fresh = [];
       for (let k = 0, off = 12; k < n; k++, off += CHUNK_BYTES) storeChunk(dv, off, touched, fresh);
-      for (const key of touched) { renderChunkKey(key); pendingPatch.add(key); }
+      for (const key of touched) renderChunkKey(key);
       // A POI that just became explored gets a label, which needs a fresh layout
-      if (fresh.some((key) => poiKeys.has(key))) layer.valid = false;
+      if (fresh.some((key) => poiKeys.has(key))) poiLayout.valid = false;
       seq = s;
       if (wantEpoch !== epoch) wantEpoch = epoch; // game reset again while we fetched; the next 'map' event catches up
       requestDraw();
@@ -510,7 +474,7 @@ function connect() {
   es.onerror = () => { connected = false; updateOverlay(); };
   es.addEventListener('state', (ev) => {
     gameState = JSON.parse(ev.data).state;
-    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; pois = []; layer.valid = false; }
+    if (gameState !== 'ingame') { player = null; track.length = 0; world = null; navs.clear(); navOrder = []; pois = []; poiLayout.valid = false; }
     updateOverlay();
     requestDraw();
   });
@@ -531,7 +495,7 @@ function connect() {
     navOrder = [];
     wsClear();
     pois = [];
-    layer.valid = false;
+    poiLayout.valid = false;
     centeredOnce = false;
     requestDraw();
   });
@@ -543,7 +507,7 @@ function connect() {
     if (typeof settings.zoom === 'number' && performance.now() - zoomedAt > 1500) view.scale = settings.zoom;
     follow = settings.follow !== 'free';
     updateFollowButton();
-    invalidateLayer();
+    invalidateLayout();
     wsUpdateVisibility();
     wsRender();
   });
@@ -565,10 +529,11 @@ const STATES = {
   offline: ['Game not running', 'Start 7 Days to Die with WebMap installed. This page reconnects by itself.', 'Not connected'],
   menu: ['Not in a game', 'Load a world or join a server and your map will show up here.', 'Main menu'],
   loading: ['Loading world…', 'Your map will show up once you spawn in.', 'Loading'],
+  nogl: ['WebGL is off', 'The map needs WebGL 2. Turn on hardware acceleration in the browser settings, or use a current Chrome, Edge or Firefox.', 'No WebGL'],
 };
 
 function updateOverlay() {
-  const key = !connected ? 'offline' : gameState === 'ingame' ? null : gameState;
+  const key = !glr ? 'nogl' : !connected ? 'offline' : gameState === 'ingame' ? null : gameState;
   const info = key ? STATES[key] || STATES.menu : null;
   overlayEl.hidden = !info;
   if (info) {
@@ -710,7 +675,7 @@ function diagFrame(start, end, moving) {
     diag.reportedAt = 0;
     diagReport('frames while moving: ' + diag.fps + ' fps, worst gap ' + Math.round(fps.gapMax) + ' ms, draw script ' +
       (fps.costSum / fps.frames).toFixed(1) + ' ms avg / ' + Math.round(fps.costMax) + ' ms max, POI labels ' +
-      (settings.pois ? 'on' : 'off') + ', ' + renderer + ', zoom ' + view.scale + ', canvas ' + canvas.width + 'x' + canvas.height);
+      (settings.pois ? 'on' : 'off') + ', zoom ' + view.scale + ', canvas ' + canvas.width + 'x' + canvas.height);
   }
   fps.frames = fps.gapSum = fps.gapMax = fps.costSum = fps.costMax = 0;
   fps.since = start;
@@ -731,20 +696,8 @@ setInterval(() => {
 
 // ---- Drawing ----
 
-function setRenderer(name) {
-  if (name === 'webgl' && !glr) glr = createGlRenderer(glCanvas);
-  if (!glr) name = 'canvas';
-  renderer = name;
-  glCanvas.style.display = name === 'webgl' ? 'block' : 'none';
-  updateReadout();
-  layer.valid = false;
-  for (const t of tiles.values()) t.dirty = true;  // the canvas copies of tiles may be stale
-  try { localStorage.setItem('renderer', name); } catch (err) { /* private window */ }
-  requestDraw();
-}
-
-function invalidateLayer() {
-  layer.valid = false;
+function invalidateLayout() {
+  poiLayout.valid = false;
   requestDraw();
 }
 
@@ -794,24 +747,18 @@ function draw() {
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.width, H = canvas.height;
   if (!W || !H) return;
-  // WebGL slides the map and labels together by fractions of a pixel while moving, so movement is smooth, and
-  // settles on whole pixels when still, so labels are crisp. The canvas renderer can only place its cached
-  // layer and labels on whole pixels, so it always snaps (otherwise labels hop against the map).
-  const gl = renderer === 'webgl' && !glr.lost;
+  // The map and labels slide together by fractions of a pixel while moving, so movement is smooth, and
+  // settle on whole pixels when still, so labels are crisp
   const vx = view.x, vz = view.z, s = view.scale * dpr;
-  const sliding = gl && (vx !== lastView.x || vz !== lastView.z);
+  const sliding = vx !== lastView.x || vz !== lastView.z;
   lastView.x = vx; lastView.z = vz;
   if (!sliding) {
     view.x = (W / 2 - Math.round(W / 2 - vx * s)) / s;
     view.z = (Math.round(H / 2 + vz * s) - H / 2) / s;
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  if (gl) {
-    glr.draw(W, H, dpr);
-    ctx.clearRect(0, 0, W, H);
-  } else {
-    drawLayer(W, H, dpr);
-  }
+  if (glr && !glr.lost) glr.draw(W, H, dpr);  // while the GPU context is lost (driver reset) only markers show
+  ctx.clearRect(0, 0, W, H);
   drawNavs(dpr);
   if (player) drawPlayer(dpr);
   view.x = vx;
@@ -822,99 +769,6 @@ function draw() {
   diagFrame(t, performance.now(), moving);
 }
 
-// Puts the static layer on screen, rebuilding or patching it first when needed
-function drawLayer(W, H, dpr) {
-  const s = view.scale * dpr;
-  let dx = (layer.x - view.x) * s, dy = (view.z - layer.z) * s;  // layer center relative to screen center
-  if (!layer.valid || layer.scale !== view.scale || layer.dpr !== dpr || layer.canvas.width !== W * 2 ||
-      layer.canvas.height !== H * 2 || Math.abs(dx) > W / 2 || Math.abs(dy) > H / 2) {
-    buildLayer(W * 2, H * 2, dpr);
-    dx = dy = 0;
-  } else if (pendingPatch.size) {
-    patchLayer(dpr);
-  }
-  pendingPatch.clear();
-  // Whole pixels, so sliding the layer never resamples it
-  ctx.drawImage(layer.canvas, Math.round(dx - W / 2), Math.round(dy - H / 2));
-}
-
-function buildLayer(w, h, dpr) {
-  if (layer.canvas.width !== w || layer.canvas.height !== h) {
-    layer.canvas.width = w;
-    layer.canvas.height = h;
-  }
-  layer.x = view.x; layer.z = view.z; layer.scale = view.scale; layer.dpr = dpr; layer.valid = true;
-  const g = layer.ctx;
-  paint = { x: layer.x, z: layer.z, w, h };
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  drawBackground(g, 0, 0, w, h);
-  drawTiles(g, 0, 0, w, h, dpr);
-  drawPois(g, w, h, dpr);
-  paint = null;
-}
-
-// Redraws just the area of newly explored chunks (and their neighbours, whose fog edges changed)
-function patchLayer(dpr) {
-  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
-  for (const key of pendingPatch) {
-    const comma = key.indexOf(',');
-    const cx = +key.slice(0, comma), cz = +key.slice(comma + 1);
-    if (cx < minX) minX = cx; if (cx > maxX) maxX = cx;
-    if (cz < minZ) minZ = cz; if (cz > maxZ) maxZ = cz;
-  }
-  const g = layer.ctx, w = layer.canvas.width, h = layer.canvas.height;
-  paint = { x: layer.x, z: layer.z, w, h };
-  const [ax, ay] = worldToScreen(minX * 16, (maxZ + 1) * 16);
-  const [bx, by] = worldToScreen((maxX + 1) * 16, minZ * 16);
-  const x0 = Math.max(0, Math.floor(ax) - 1), y0 = Math.max(0, Math.floor(ay) - 1);
-  const x1 = Math.min(w, Math.ceil(bx) + 1), y1 = Math.min(h, Math.ceil(by) + 1);
-  if (x1 > x0 && y1 > y0) {
-    g.save();
-    g.beginPath();
-    g.rect(x0, y0, x1 - x0, y1 - y0);
-    g.clip();
-    drawBackground(g, x0, y0, x1 - x0, y1 - y0);
-    drawTiles(g, x0, y0, x1, y1, dpr);
-    setPoiFont(g, dpr);
-    for (const e of layer.labels) {
-      if (e.bx1 > x0 && e.bx0 < x1 && e.by1 > y0 && e.by0 < y1) drawPoi(g, e, dpr);
-    }
-    g.restore();
-  }
-  paint = null;
-}
-
-// The game's concrete texture moves and scales with the map; it repeats every 2048 blocks
-function drawBackground(g, x, y, w, h) {
-  if (!bgPattern) {
-    g.fillStyle = '#7d7d7d';
-    g.fillRect(x, y, w, h);
-    return;
-  }
-  const dpr = window.devicePixelRatio || 1;
-  const [ox, oy] = worldToScreen(0, 0);
-  const k = 2048 / bgImage.width * view.scale * dpr;
-  bgPattern.setTransform(new DOMMatrix([k, 0, 0, k, ox, oy]));
-  g.fillStyle = bgPattern;
-  g.fillRect(x, y, w, h);
-}
-
-function drawTiles(g, x0, y0, x1, y1, dpr) {
-  // The game draws its map texture with bilinear filtering
-  g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = 'high';
-  const size = TILE_PX * view.scale * dpr;
-  for (const t of tiles.values()) {
-    const [x, y] = worldToScreen(t.rx * TILE_PX, (t.rz + 1) * TILE_PX);
-    if (x > x1 || y > y1 || x + size < x0 || y + size < y0) continue;
-    if (t.dirty) { t.ctx.putImageData(t.img, 0, 0); t.dirty = false; }
-    // Whole-pixel edges, so neighbouring tiles meet without a seam at in-between zooms
-    const l = Math.round(x), tp = Math.round(y);
-    g.drawImage(t.canvas, l, tp, Math.round(x + size) - l, Math.round(y + size) - tp);
-  }
-}
-
-// White arrow with a dark outline and the player's name, like the in-game map marker
 function drawPlayer(dpr) {
   const [px, py] = worldToScreen(player.x, player.z);
   ctx.save();
@@ -961,7 +815,6 @@ function updateReadout() {
     lines.push('Cursor  ' + fmt(wz, 'N', 'S') + ', ' + fmt(wx, 'E', 'W'));
   }
   lines.push('Zoom    ' + (view.scale < 1 && Number.isInteger(1 / view.scale) ? '1/' + (1 / view.scale) : view.scale) + 'x');
-  lines.push('Render  ' + (renderer === 'webgl' ? 'WebGL' : 'Cached canvas') + '  (G)');
   if (diag.show) {
     lines.push('Lag     ' + diag.lag + ' ms (worst 5 min ' + diagMax(diag.worstLag) + ')');
     lines.push('Busy    worst 5 min ' + diagMax(diag.busy) + ' ms');
@@ -1040,14 +893,11 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === '+' || e.key === '=') zoomAt(1);
   else if (e.key === '-') zoomAt(-1);
   else if (e.key === 'd' || e.key === 'D') { diag.show = !diag.show; updateReadout(); }
-  else if (e.key === 'g' || e.key === 'G') setRenderer(renderer === 'webgl' ? 'canvas' : 'webgl');
 });
 window.addEventListener('resize', resize);
 
 resize();
-let savedRenderer = null;
-try { savedRenderer = localStorage.getItem('renderer'); } catch (err) { /* private window */ }
-setRenderer(new URLSearchParams(location.search).get('renderer') || savedRenderer || 'webgl');
+glr = createGlRenderer(glCanvas);
 updateOverlay();
 loadLook();
 connect();

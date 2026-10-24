@@ -19,7 +19,7 @@ Everything is controlled from inside the game, in a panel on the map screen (**M
 - **Follow or pan.** Follow yourself or a party member, or pan freely with the mouse.
 - **Zoom.** From 1/16× (whole map) to 8×, with in-between steps (0.75×, 1.25×, 1.5×, 1.75×, 2.5×...).
 - **Text and icon sizes.** Adjustable for POI labels, marker labels, your name and icons.
-- **Fast.** The map is drawn with WebGL by default (press **G** on the page to switch to a 2D canvas fallback).
+- **Fast.** The map is drawn with WebGL 2, so panning and zooming stay smooth on big screens.
 
 ## Install
 
@@ -52,7 +52,6 @@ On the page itself you can also drag to pan, use the mouse wheel or **+**/**-** 
 | Key | Action |
 |-----|--------|
 | F | Follow on/off |
-| G | Switch renderer (WebGL / cached canvas) |
 | D | Diagnostics readout (frame rate, update delays) |
 
 Console commands (F1):
