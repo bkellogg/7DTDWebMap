@@ -107,8 +107,9 @@ function createGlRenderer(cv) {
   function labelSlot(p, dpr) {
     const skullIcon = iconFor(SKULL, SKULL_COLOR);
     const slot = p.slot;
-    if (slot && slot.gen === atlas.gen && slot.dpr === dpr && slot.skull === !!skullIcon) return slot;
-    const fontPx = 12 * dpr, skull = Math.round(11 * dpr), pad = Math.ceil(2 * dpr);
+    const k = sizeOf('poi');
+    const fontPx = 12 * dpr * k, skull = Math.round(11 * dpr * k), pad = Math.ceil(2 * dpr);
+    if (slot && slot.gen === atlas.gen && slot.fontPx === fontPx && slot.skull === !!skullIcon) return slot;
     const w = Math.ceil(p.tw + (p.tier ? 3 * dpr + p.tier * skull : 0)) + pad * 2;
     const h = Math.ceil(fontPx * 1.4) + pad * 2;
     const s = alloc(w, h);
@@ -126,7 +127,7 @@ function createGlRenderer(cv) {
     }
     gl.bindTexture(gl.TEXTURE_2D, atlasTex);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, s.x, s.y, gl.RGBA, gl.UNSIGNED_BYTE, scratch);
-    p.slot = { x: s.x, y: s.y, w, h, pad, gen: atlas.gen, dpr, skull: !!skullIcon };
+    p.slot = { x: s.x, y: s.y, w, h, pad, gen: atlas.gen, fontPx, skull: !!skullIcon };
     return p.slot;
   }
 

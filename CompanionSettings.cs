@@ -23,6 +23,12 @@ namespace WebCompanion
         public const int MinZoom = -4;
         public const int MaxZoom = 3;
 
+        // Text and icon sizes on the page, in percent
+        public static readonly string[] SizeKeys = { "poi", "marker", "player", "icons" };
+        public static readonly string[] SizeNames = { "POI labels", "Marker labels", "Your name", "Icons" };
+        public static readonly int[] SizeSteps = { 75, 100, 125, 150, 200 };
+        private static readonly int[] sizes = { 100, 100, 100, 100 };
+
         // "self", "free" or a player's entity id
         public static string Follow { get; private set; } = FollowSelf;
         public static bool ShowPois { get; private set; } = true;
@@ -85,6 +91,19 @@ namespace WebCompanion
             Changed(true);
         }
 
+        public static int GetSize(int _index)
+        {
+            return sizes[_index];
+        }
+
+        public static void SetSize(int _index, int _percent)
+        {
+            if (_index < 0 || _index >= sizes.Length || Array.IndexOf(SizeSteps, _percent) < 0) return;
+            if (sizes[_index] == _percent) return;
+            sizes[_index] = _percent;
+            Changed(true);
+        }
+
         public static string ZoomName(int _zoom)
         {
             return _zoom >= 0 ? (1 << _zoom) + "x" : "1/" + (1 << -_zoom) + "x";
@@ -123,6 +142,11 @@ namespace WebCompanion
                         else if (key == "pois") ShowPois = value != "false";
                         else if (key == "poiMinTier" && int.TryParse(value, out n)) PoiMinTier = Math.Max(0, Math.Min(MaxTier, n));
                         else if (key == "zoom" && int.TryParse(value, out n)) Zoom = Math.Max(MinZoom, Math.Min(MaxZoom, n));
+                        else if (key.StartsWith("size_") && int.TryParse(value, out n) && Array.IndexOf(SizeSteps, n) >= 0)
+                        {
+                            int i = Array.IndexOf(SizeKeys, key.Substring(5));
+                            if (i >= 0) sizes[i] = n;
+                        }
                     }
                 }
             }
@@ -145,11 +169,13 @@ namespace WebCompanion
         {
             try
             {
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < SizeKeys.Length; i++) sb.Append("size_").Append(SizeKeys[i]).Append('=').Append(sizes[i]).Append('\n');
                 File.WriteAllText(FilePath,
                     "hidden=" + string.Join(",", hidden) + "\n" +
                     "pois=" + (ShowPois ? "true" : "false") + "\n" +
                     "poiMinTier=" + PoiMinTier + "\n" +
-                    "zoom=" + Zoom + "\n");
+                    "zoom=" + Zoom + "\n" + sb);
             }
             catch (Exception ex)
             {
@@ -157,7 +183,7 @@ namespace WebCompanion
             }
         }
 
-        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":n}
+        // {"follow":"self"|"free"|entityId,"hide":[...],"pois":bool,"poiMinTier":n,"zoom":n,"sizes":{"poi":100,...}}
         private static string ToJson()
         {
             StringBuilder sb = new StringBuilder("{\"follow\":");
@@ -172,7 +198,14 @@ namespace WebCompanion
             }
             sb.Append("],\"pois\":").Append(ShowPois ? "true" : "false");
             sb.Append(",\"poiMinTier\":").Append(PoiMinTier);
-            sb.Append(",\"zoom\":").Append(Zoom).Append('}');
+            sb.Append(",\"zoom\":").Append(Zoom);
+            sb.Append(",\"sizes\":{");
+            for (int i = 0; i < SizeKeys.Length; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append('"').Append(SizeKeys[i]).Append("\":").Append(sizes[i]);
+            }
+            sb.Append("}}");
             return sb.ToString();
         }
     }

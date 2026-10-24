@@ -1,38 +1,53 @@
 <configs>
 	<!-- Web Companion controls, on the right side of the map screen (M). Controller: XUiC_CompanionPanel.cs -->
 	<append xpath="/windows">
-		<window name="webCompanionPanel" width="354" height="586" panel="Right" controller="WebCompanion.CompanionPanel, WebCompanion" cursor_area="true">
+		<window name="webCompanionPanel" width="354" height="626" panel="Right" controller="WebCompanion.CompanionPanel, WebCompanion" cursor_area="true">
 			<rect name="header" pos="3,0" height="43" depth="1">
 				<headerbg />
 				<sprite depth="1" name="windowIcon" style="icon32px" pos="4,-5" sprite="ui_game_symbol_map" />
 				<label style="header.name" text="WEB COMPANION" />
 			</rect>
 
-			<rect name="content" depth="0" pos="0,-46" height="540">
-				<sprite depth="0" pos="3,0" width="351" height="540" color="[darkestGrey]" type="sliced" />
-				<sprite depth="8" sprite="menu_empty3px" pos="3,0" width="351" height="540" color="[black]" type="sliced" fillcenter="false" />
+			<rect name="content" depth="0" pos="0,-46" height="580">
+				<sprite depth="0" pos="3,0" width="351" height="580" color="[darkestGrey]" type="sliced" />
+				<sprite depth="8" sprite="menu_empty3px" pos="3,0" width="351" height="580" color="[black]" type="sliced" fillcenter="false" />
 
-				<label depth="1" pos="14,-12" width="90" height="28" text="Follow" font_size="26" />
-				<combobox depth="2" name="cbxFollow" type="ComboBoxList`1[System.String]" value_wrap="true" pos="100,-10" width="244" height="30" />
+				<rect name="pageBasic" depth="1" pos="0,0" width="354" height="490">
+					<label depth="1" pos="14,-12" width="90" height="28" text="Follow" font_size="26" />
+					<combobox depth="2" name="cbxFollow" type="ComboBoxList`1[System.String]" value_wrap="true" pos="100,-10" width="244" height="30" />
 
-				<label depth="1" pos="14,-52" width="90" height="28" text="Zoom" font_size="26" />
-				<combobox depth="2" name="cbxZoom" type="ComboBoxList`1[System.String]" value_wrap="false" pos="100,-50" width="244" height="30" />
+					<label depth="1" pos="14,-52" width="90" height="28" text="Zoom" font_size="26" />
+					<combobox depth="2" name="cbxZoom" type="ComboBoxList`1[System.String]" value_wrap="false" pos="100,-50" width="244" height="30" />
 
-				<label depth="1" pos="14,-92" width="330" height="28" text="Show on map" font_size="24" color="222,206,163,255" />
-				<togglebutton depth="2" name="show_players" pos="12,-124" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_waypoints" pos="12,-160" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_base" pos="12,-196" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_loot" pos="12,-232" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_vehicles" pos="12,-268" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_quests" pos="12,-304" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_creatures" pos="12,-340" width="330" height="32" font_size="24" />
-				<togglebutton depth="2" name="show_other" pos="12,-376" width="330" height="32" font_size="24" />
+					<label depth="1" pos="14,-92" width="330" height="28" text="Show on map" font_size="24" color="222,206,163,255" />
+					<togglebutton depth="2" name="show_players" pos="12,-124" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_waypoints" pos="12,-160" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_base" pos="12,-196" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_loot" pos="12,-232" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_vehicles" pos="12,-268" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_quests" pos="12,-304" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_creatures" pos="12,-340" width="330" height="32" font_size="24" />
+					<togglebutton depth="2" name="show_other" pos="12,-376" width="330" height="32" font_size="24" />
 
-				<label depth="1" pos="14,-420" width="330" height="28" text="POI labels (explored areas)" font_size="24" color="222,206,163,255" />
-				<togglebutton depth="2" name="togglePois" pos="12,-452" width="150" height="32" font_size="24" caption="Show" />
-				<combobox depth="2" name="cbxTier" type="ComboBoxList`1[System.String]" value_wrap="false" pos="170,-453" width="174" height="30" />
+					<label depth="1" pos="14,-420" width="330" height="28" text="POI labels (explored areas)" font_size="24" color="222,206,163,255" />
+					<togglebutton depth="2" name="togglePois" pos="12,-452" width="150" height="32" font_size="24" caption="Show" />
+					<combobox depth="2" name="cbxTier" type="ComboBoxList`1[System.String]" value_wrap="false" pos="170,-453" width="174" height="30" />
+				</rect>
 
-				<label depth="1" name="status" pos="14,-500" width="330" height="28" text="" font_size="22" />
+				<rect name="pageAdvanced" depth="1" pos="0,0" width="354" height="490" visible="false">
+					<label depth="1" pos="14,-12" width="330" height="28" text="Text &amp; icon size on the companion page" font_size="24" color="222,206,163,255" />
+					<label depth="1" name="sizeLabel_poi" pos="14,-54" width="170" height="28" text="" font_size="24" />
+					<combobox depth="2" name="size_poi" type="ComboBoxList`1[System.String]" value_wrap="false" pos="190,-52" width="154" height="30" />
+					<label depth="1" name="sizeLabel_marker" pos="14,-94" width="170" height="28" text="" font_size="24" />
+					<combobox depth="2" name="size_marker" type="ComboBoxList`1[System.String]" value_wrap="false" pos="190,-92" width="154" height="30" />
+					<label depth="1" name="sizeLabel_player" pos="14,-134" width="170" height="28" text="" font_size="24" />
+					<combobox depth="2" name="size_player" type="ComboBoxList`1[System.String]" value_wrap="false" pos="190,-132" width="154" height="30" />
+					<label depth="1" name="sizeLabel_icons" pos="14,-174" width="170" height="28" text="" font_size="24" />
+					<combobox depth="2" name="size_icons" type="ComboBoxList`1[System.String]" value_wrap="false" pos="190,-172" width="154" height="30" />
+				</rect>
+
+				<simplebutton depth="3" name="btnAdvanced" pos="12,-496" width="330" height="34" font_size="24" caption="Text &amp; icon sizes" />
+				<label depth="1" name="status" pos="14,-540" width="330" height="28" text="" font_size="22" />
 			</rect>
 		</window>
 	</append>

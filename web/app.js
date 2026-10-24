@@ -49,6 +49,10 @@ const view = { x: 0, z: 0, scale: 1 }; // world point at screen center, screen p
 // What to show, set from the in-game panel (map screen) or here. follow: 'self', 'free' or a player's entity id.
 let settings = { follow: 'self', hide: [], pois: true, poiMinTier: 1 };
 let hidden = new Set();
+// Size multiplier from the panel's "Text & icon sizes" page: poi, marker, player, icons
+function sizeOf(key) {
+  return ((settings.sizes && settings.sizes[key]) || 100) / 100;
+}
 let follow = true;  // settings.follow !== 'free'
 
 // POIs for labels: { name, x, z, w, h, tier, key (center chunk) }; drawn only where the map is explored.
@@ -208,16 +212,17 @@ function iconFor(sprite, color) {
 function drawNavs(dpr) {
   // Icons grow a little when zoomed in, like the in-game map, within limits
   const zoom = Math.min(1.6, Math.max(0.6, Math.sqrt(view.scale)));
-  ctx.font = '600 ' + (12 * dpr) + 'px system-ui, "Segoe UI", sans-serif';
+  ctx.font = '600 ' + (12 * dpr * sizeOf('marker')) + 'px system-ui, "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   const labels = [];  // text, x, y, color
+  const k = sizeOf('icons');
   for (const n of navOrder) {
     if (hidden.has(n.cat)) continue;
     const icon = iconFor(n.s, n.c);
     if (!icon) continue;
-    const w = Math.min(56, Math.max(10, 26 * n.sx * zoom)) * dpr;
-    const h = Math.min(56, Math.max(10, 26 * n.sy * zoom)) * dpr;
+    const w = Math.min(56, Math.max(10, 26 * n.sx * zoom)) * dpr * k;
+    const h = Math.min(56, Math.max(10, 26 * n.sy * zoom)) * dpr * k;
     let [x, y] = worldToScreen(n.dx, n.dz);
     if (n.ac) { x += w / 2; y -= h / 2; }
     if (x < -w || y < -h || x > canvas.width + w || y > canvas.height + h) continue;
@@ -280,18 +285,19 @@ function markerBoxes(dpr) {
   for (const n of navOrder) {
     if (hidden.has(n.cat)) continue;
     const [x, y] = worldToScreen(n.dx, n.dz);
-    const r = Math.min(56, Math.max(10, 26 * Math.max(n.sx, n.sy) * zoom)) * dpr / 2;
+    const r = Math.min(56, Math.max(10, 26 * Math.max(n.sx, n.sy) * zoom)) * dpr / 2 * sizeOf('icons');
     boxes.push(x - r, y - r, x + r, y + r);
     if (n.l) {
-      const lw = n.l.length * 3.5 * dpr;
-      boxes.push(x - lw, y - r - 16 * dpr, x + lw, y - r);
+      const k = sizeOf('marker');
+      const lw = n.l.length * 3.5 * dpr * k;
+      boxes.push(x - lw, y - r - 16 * dpr * k, x + lw, y - r);
     }
   }
   return boxes;
 }
 
 function setPoiFont(g, dpr) {
-  g.font = '600 ' + (12 * dpr) + 'px system-ui, "Segoe UI", sans-serif';
+  g.font = '600 ' + (12 * dpr * sizeOf('poi')) + 'px system-ui, "Segoe UI", sans-serif';
   g.textAlign = 'left';
   g.textBaseline = 'middle';
 }
@@ -306,8 +312,8 @@ function drawPois(g, W, H, dpr) {
 function layoutPois(g, bx0, by0, bx1, by1, dpr) {
   const entries = [];
   if (!settings.pois || !pois.length) return entries;
-  const fontPx = 12 * dpr;
-  const skull = Math.round(11 * dpr);
+  const fontPx = 12 * dpr * sizeOf('poi');
+  const skull = Math.round(11 * dpr * sizeOf('poi'));
   setPoiFont(g, dpr);
   const placed = markerBoxes(dpr);
   const outlines = view.scale >= 0.5;
@@ -320,7 +326,7 @@ function layoutPois(g, bx0, by0, bx1, by1, dpr) {
     const e = { p, x, y, hw, hh, outline: outlines && hw > 8 * dpr, x0: 0, ly: null, skull };
 
     // Centered on the POI, or just below / above it when a marker is in the way
-    if (p.twDpr !== dpr) { p.tw = g.measureText(p.name).width; p.twDpr = dpr; }
+    if (p.twFont !== fontPx) { p.tw = g.measureText(p.name).width; p.twFont = fontPx; }
     const total = p.tw + (p.tier ? 3 * dpr + p.tier * skull : 0);
     const x0 = x - total / 2, x1 = x0 + total, half = fontPx * 0.7;
     for (const dy of [0, 2.2 * half, -2.2 * half]) {
@@ -856,7 +862,7 @@ function drawPlayer(dpr) {
   ctx.translate(px, py);
   ctx.save();
   ctx.rotate(player.yaw * Math.PI / 180);
-  const s = 7 * dpr;
+  const s = 7 * dpr * sizeOf('icons');
   ctx.beginPath();
   ctx.moveTo(0, -s * 1.5);
   ctx.lineTo(s, s);
@@ -871,14 +877,14 @@ function drawPlayer(dpr) {
   ctx.fill();
   ctx.restore();
   if (world && world.player) {
-    ctx.font = '600 ' + (13 * dpr) + 'px system-ui, "Segoe UI", sans-serif';
+    ctx.font = '600 ' + (13 * dpr * sizeOf('player')) + 'px system-ui, "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3 * dpr;
     ctx.strokeStyle = 'rgba(0,0,0,.7)';
-    ctx.strokeText(world.player, 0, -s * 1.9);
+    ctx.strokeText(world.player, 0, -s * 1.6);
     ctx.fillStyle = '#f2f2f2';
-    ctx.fillText(world.player, 0, -s * 1.9);
+    ctx.fillText(world.player, 0, -s * 1.6);
   }
   ctx.restore();
 }

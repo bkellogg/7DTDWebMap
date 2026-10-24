@@ -18,6 +18,11 @@ namespace WebCompanion
         private XUiC_ToggleButton togglePois;
         private readonly XUiC_ToggleButton[] categoryToggles = new XUiC_ToggleButton[CompanionSettings.Categories.Length];
         private XUiV_Label lblStatus;
+        private readonly XUiC_ComboBoxList<string>[] sizeBoxes = new XUiC_ComboBoxList<string>[CompanionSettings.SizeKeys.Length];
+        private XUiView pageBasic;
+        private XUiView pageAdvanced;
+        private XUiC_SimpleButton btnAdvanced;
+        private bool showAdvanced;
 
         // Follow choices shown in cbxFollow: CompanionSettings follow values, same order
         private readonly List<string> followKeys = new List<string>();
@@ -64,6 +69,29 @@ namespace WebCompanion
                 toggle.OnValueChanged += (_sender, _value) => CompanionSettings.SetHidden(category, !_value);
             }
 
+            for (int i = 0; i < sizeBoxes.Length; i++)
+            {
+                XUiC_ComboBoxList<string> box = GetChildById("size_" + CompanionSettings.SizeKeys[i]) as XUiC_ComboBoxList<string>;
+                sizeBoxes[i] = box;
+                if (box == null) continue;
+                box.Elements.Clear();
+                foreach (int step in CompanionSettings.SizeSteps) box.Elements.Add(step + "%");
+                int index = i;
+                box.OnValueChanged += (_sender, _old, _new) =>
+                    CompanionSettings.SetSize(index, CompanionSettings.SizeSteps[box.SelectedIndex]);
+                XUiController label = GetChildById("sizeLabel_" + CompanionSettings.SizeKeys[i]);
+                XUiV_Label lbl = label != null ? label.ViewComponent as XUiV_Label : null;
+                if (lbl != null) lbl.Text = CompanionSettings.SizeNames[i];
+            }
+
+            // Two pages in one window: the usual settings, and text/icon sizes behind "Advanced"
+            XUiController basic = GetChildById("pageBasic");
+            XUiController advanced = GetChildById("pageAdvanced");
+            pageBasic = basic != null ? basic.ViewComponent : null;
+            pageAdvanced = advanced != null ? advanced.ViewComponent : null;
+            btnAdvanced = GetChildById("btnAdvanced") as XUiC_SimpleButton;
+            if (btnAdvanced != null) btnAdvanced.OnPressed += (_sender, _button) => ShowPage(!showAdvanced);
+
             XUiController status = GetChildById("status");
             lblStatus = status != null ? status.ViewComponent as XUiV_Label : null;
         }
@@ -73,6 +101,15 @@ namespace WebCompanion
             base.OnOpen();
             seenVersion = -1;
             nextRefresh = 0f;
+            ShowPage(false);
+        }
+
+        private void ShowPage(bool _advanced)
+        {
+            showAdvanced = _advanced;
+            if (pageBasic != null) pageBasic.IsVisible = !_advanced;
+            if (pageAdvanced != null) pageAdvanced.IsVisible = _advanced;
+            if (btnAdvanced != null) btnAdvanced.Text = _advanced ? "Back" : "Text & icon sizes";
         }
 
         public override void Update(float _dt)
@@ -157,6 +194,11 @@ namespace WebCompanion
             if (togglePois != null) togglePois.Value = CompanionSettings.ShowPois;
             if (cbxTier != null) cbxTier.SelectedIndex = CompanionSettings.PoiMinTier;
             if (cbxZoom != null) cbxZoom.SelectedIndex = CompanionSettings.Zoom - CompanionSettings.MinZoom;
+            for (int i = 0; i < sizeBoxes.Length; i++)
+            {
+                int step = System.Array.IndexOf(CompanionSettings.SizeSteps, CompanionSettings.GetSize(i));
+                if (sizeBoxes[i] != null && step >= 0) sizeBoxes[i].SelectedIndex = step;
+            }
         }
 
         private void SelectFollow()
