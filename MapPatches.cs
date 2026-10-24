@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 
-namespace WebCompanion
+namespace WebMap
 {
     // Records which chunks of the local player's map changed. Only a set insert happens here;
     // Companion.Tick copies the colors later, throttled and budgeted.

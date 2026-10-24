@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using UnityEngine.Scripting;
 
-namespace WebCompanion
+namespace WebMap
 {
-    // The "Web Companion" panel on the right side of the map screen (M). Window in Config/XUi_InGame/windows.xml.
+    // The "Web Map" panel on the right side of the map screen (M). Window in Config/XUi_InGame/windows.xml.
     // Only runs while the map screen is open.
     [Preserve]
     [SuppressMessage("ReSharper", "UnusedType.Global")]
@@ -218,7 +218,7 @@ namespace WebCompanion
         {
             if (lblStatus == null) return;
             lblStatus.Text = WebHost.ClientCount > 0
-                ? "[80C080]Companion page open[-]"
+                ? "[80C080]Web map open in a browser[-]"
                 : "Open [DECEA3]" + WebHost.Url + "[-] in a browser";
         }
 

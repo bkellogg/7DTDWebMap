@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 
-namespace WebCompanion
+namespace WebMap
 {
     // Everything the mod does on the game's main thread. It only copies data and hands it to WebHost;
     // building responses, comparing and sending all happen on WebHost's threads.
@@ -221,7 +221,7 @@ namespace WebCompanion
             }
             else
             {
-                Log.Warning("[WebCompanion] Unknown map database type " + _db.GetType().Name + ", only new chunks will show");
+                Log.Warning("[WebMap] Unknown map database type " + _db.GetType().Name + ", only new chunks will show");
                 sync = SyncState.Done;
                 return;
             }
@@ -275,7 +275,7 @@ namespace WebCompanion
             syncRegions = null;
             syncFixed = null;
             syncKeys = null;
-            Log.Out("[WebCompanion] Initial map copy done: " + syncCopied + " chunks");
+            Log.Out("[WebMap] Initial map copy done: " + syncCopied + " chunks");
         }
 
         private static void DrainDirty(IMapChunkDatabase _db)

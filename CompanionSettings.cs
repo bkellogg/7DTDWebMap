@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace WebCompanion
+namespace WebMap
 {
     // What the companion page shows: who it follows, which marker kinds are hidden, POI labels.
     // Changed from the in-game panel (map screen) or the page; main thread only. Every change goes to the page.
@@ -41,7 +41,9 @@ namespace WebCompanion
         private static readonly HashSet<string> hidden = new HashSet<string>();
         private static bool loaded;
 
-        private static string FilePath => Path.Combine(GameIO.GetUserGameDataDir(), "WebCompanion.txt");
+        private static string FilePath => Path.Combine(GameIO.GetUserGameDataDir(), "WebMap.txt");
+        // Settings file from before the mod was renamed, read when there is no new one yet
+        private static string OldFilePath => Path.Combine(GameIO.GetUserGameDataDir(), "WebCompanion.txt");
 
         public static bool IsHidden(string _category)
         {
@@ -123,9 +125,10 @@ namespace WebCompanion
             loaded = true;
             try
             {
-                if (File.Exists(FilePath))
+                string path = File.Exists(FilePath) ? FilePath : OldFilePath;
+                if (File.Exists(path))
                 {
-                    foreach (string line in File.ReadAllLines(FilePath))
+                    foreach (string line in File.ReadAllLines(path))
                     {
                         int eq = line.IndexOf('=');
                         if (eq < 0) continue;
@@ -152,7 +155,7 @@ namespace WebCompanion
             }
             catch (Exception ex)
             {
-                Log.Warning("[WebCompanion] Could not read " + FilePath + ": " + ex.Message);
+                Log.Warning("[WebMap] Could not read " + FilePath + ": " + ex.Message);
             }
             Version++;
             WebHost.PostView(ToJson());
@@ -179,7 +182,7 @@ namespace WebCompanion
             }
             catch (Exception ex)
             {
-                Log.Warning("[WebCompanion] Could not save " + FilePath + ": " + ex.Message);
+                Log.Warning("[WebMap] Could not save " + FilePath + ": " + ex.Message);
             }
         }
 

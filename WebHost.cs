@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using SpaceWizards.HttpListener;
 
-namespace WebCompanion
+namespace WebMap
 {
     // Local web server for the companion page. Bound to 127.0.0.1 only.
     // The main thread only enqueues messages (PostChunk etc.); the pusher thread keeps a mirror of the map,
@@ -116,7 +116,7 @@ namespace WebCompanion
             webRoot = _webRoot;
             if (!HttpListener.IsSupported)
             {
-                Log.Error("[WebCompanion] HttpListener not supported on this platform, companion disabled");
+                Log.Error("[WebMap] HttpListener not supported on this platform, web map disabled");
                 return;
             }
             try
@@ -127,16 +127,16 @@ namespace WebCompanion
             }
             catch (Exception ex)
             {
-                Log.Error("[WebCompanion] Could not listen on " + Url + " (port in use?): " + ex.Message);
+                Log.Error("[WebMap] Could not listen on " + Url + " (port in use?): " + ex.Message);
                 listener = null;
                 return;
             }
 
             running = true;
-            pusher = new Thread(PushLoop) { IsBackground = true, Name = "WebCompanion pusher" };
+            pusher = new Thread(PushLoop) { IsBackground = true, Name = "WebMap pusher" };
             pusher.Start();
             listener.BeginGetContext(OnContext, null);
-            Log.Out("[WebCompanion] Open " + Url + " in a browser");
+            Log.Out("[WebMap] Open " + Url + " in a browser");
         }
 
         public static void Stop()
@@ -250,7 +250,7 @@ namespace WebCompanion
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("[WebCompanion] Pusher error: " + ex);
+                    Log.Error("[WebMap] Pusher error: " + ex);
                 }
             }
         }
@@ -482,7 +482,7 @@ namespace WebCompanion
                 if (sw.ElapsedMilliseconds > 100)
                 {
                     // A tab that stops reading (asleep, frozen) blocks every other tab's updates here
-                    Log.Warning("[WebCompanion] Slow write to a browser tab: " + sw.ElapsedMilliseconds + " ms, " +
+                    Log.Warning("[WebMap] Slow write to a browser tab: " + sw.ElapsedMilliseconds + " ms, " +
                                 clients.Count + " tabs open");
                 }
                 return true;
@@ -526,7 +526,7 @@ namespace WebCompanion
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("[WebCompanion] Listener stopped accepting requests: " + ex.Message);
+                    Log.Error("[WebMap] Listener stopped accepting requests: " + ex.Message);
                 }
             }
 
@@ -536,7 +536,7 @@ namespace WebCompanion
             }
             catch (Exception ex)
             {
-                Log.Warning("[WebCompanion] Request " + ctx.Request.RawUrl + " failed: " + ex.Message);
+                Log.Warning("[WebMap] Request " + ctx.Request.RawUrl + " failed: " + ex.Message);
                 try
                 {
                     ctx.Response.Abort();
@@ -582,7 +582,7 @@ namespace WebCompanion
             if (path == "/view")
             {
                 // Custom header: other websites can't send it without a CORS preflight, which this server never allows
-                if (req.HttpMethod != "POST" || req.Headers["X-Companion"] != "1")
+                if (req.HttpMethod != "POST" || req.Headers["X-WebMap"] != "1")
                 {
                     Finish(res, 400, "text/plain", Encoding.UTF8.GetBytes("Bad request"));
                     return;
@@ -597,13 +597,13 @@ namespace WebCompanion
             if (path == "/diag")
             {
                 // The page reports position stalls here so they land in the game log
-                if (req.HttpMethod != "POST" || req.Headers["X-Companion"] != "1")
+                if (req.HttpMethod != "POST" || req.Headers["X-WebMap"] != "1")
                 {
                     Finish(res, 400, "text/plain", Encoding.UTF8.GetBytes("Bad request"));
                     return;
                 }
                 string msg = req.QueryString["m"];
-                if (!string.IsNullOrEmpty(msg) && msg.Length <= 300) Log.Out("[WebCompanion] Page: " + msg);
+                if (!string.IsNullOrEmpty(msg) && msg.Length <= 300) Log.Out("[WebMap] Page: " + msg);
                 Finish(res, 204, "text/plain", new byte[0]);
                 return;
             }
@@ -643,7 +643,7 @@ namespace WebCompanion
                 clients.Add(client);
                 clientCount = clients.Count;
             }
-            Log.Out("[WebCompanion] Browser connected (" + clientCount + " open)");
+            Log.Out("[WebMap] Browser connected (" + clientCount + " open)");
         }
 
         // Binary: int32 epoch, int32 seq, int32 count, then count x (int32 chunkX, int32 chunkZ, 256 x uint16 RGB555).

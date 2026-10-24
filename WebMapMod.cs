@@ -2,10 +2,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
 
-namespace WebCompanion
+namespace WebMap
 {
     [SuppressMessage("ReSharper", "UnusedType.Global")]
-    public class WebCompanionMod : IModApi
+    public class WebMapMod : IModApi
     {
         public const int Port = 26910;
 
@@ -14,7 +14,7 @@ namespace WebCompanion
             // The companion page shows the local player's map, so a dedicated server has nothing to serve
             if (GameManager.IsDedicatedServer)
             {
-                Log.Out("[WebCompanion] Dedicated server, web companion not started");
+                Log.Out("[WebMap] Dedicated server, web map not started");
                 return;
             }
 

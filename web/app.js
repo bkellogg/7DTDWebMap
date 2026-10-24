@@ -401,7 +401,7 @@ function setFollowTarget(target) {
   const p = followedPoint();
   if (p) { view.x = p.x; view.z = p.z; }
   requestDraw();
-  fetch('/view?follow=' + encodeURIComponent(target), { method: 'POST', headers: { 'X-Companion': '1' } })
+  fetch('/view?follow=' + encodeURIComponent(target), { method: 'POST', headers: { 'X-WebMap': '1' } })
     .catch((err) => console.warn('could not send follow change', err));
 }
 
@@ -560,7 +560,7 @@ function connect() {
 }
 
 const STATES = {
-  offline: ['Game not running', 'Start 7 Days to Die with WebCompanion installed. This page reconnects by itself.', 'Not connected'],
+  offline: ['Game not running', 'Start 7 Days to Die with WebMap installed. This page reconnects by itself.', 'Not connected'],
   menu: ['Not in a game', 'Load a world or join a server and your map will show up here.', 'Main menu'],
   loading: ['Loading world…', 'Your map will show up once you spawn in.', 'Loading'],
 };
@@ -576,7 +576,7 @@ function updateOverlay() {
   statusEl.textContent = info ? info[2] : (world && world.player ? world.player : 'In game');
   // Tab title: "PlayerName - WorldName" while in a game
   const parts = info || !world ? [] : [world.player, world.name].filter(Boolean);
-  document.title = parts.length ? parts.join(' - ') : '7DTD Companion';
+  document.title = parts.length ? parts.join(' - ') : '7DTD Web Map';
   statusEl.classList.toggle('on', connected);
   statusEl.classList.toggle('off', !connected);
 }
@@ -616,8 +616,8 @@ function diagReport(msg) {
   const now = performance.now();
   if (now - diag.reportedAt < 1000) return;
   diag.reportedAt = now;
-  console.warn('[WebCompanion]', msg);
-  fetch('/diag?m=' + encodeURIComponent(msg), { method: 'POST', headers: { 'X-Companion': '1' } }).catch(() => {});
+  console.warn('[WebMap]', msg);
+  fetch('/diag?m=' + encodeURIComponent(msg), { method: 'POST', headers: { 'X-WebMap': '1' } }).catch(() => {});
 }
 
 function diagMax(list) {
@@ -934,7 +934,7 @@ function zoomAt(factor, sx, sy) {
     view.z += wz - wz2;
   }
   zoomedAt = performance.now();
-  fetch('/view?zoom=' + Math.round(Math.log2(view.scale)), { method: 'POST', headers: { 'X-Companion': '1' } })
+  fetch('/view?zoom=' + Math.round(Math.log2(view.scale)), { method: 'POST', headers: { 'X-WebMap': '1' } })
     .catch((err) => console.warn('could not send zoom change', err));
   requestDraw();
 }

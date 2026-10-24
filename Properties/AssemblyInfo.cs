@@ -1,11 +1,11 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("WebCompanion")]
+[assembly: AssemblyTitle("WebMap")]
 [assembly: AssemblyDescription("Second-screen browser companion")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("WebCompanion")]
+[assembly: AssemblyProduct("WebMap")]
 [assembly: AssemblyCopyright("Copyright © 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

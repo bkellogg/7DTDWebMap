@@ -8,13 +8,13 @@
         <ProjectGuid>{7D2D0F1E-5A3B-4C6D-9E8F-0A1B2C3D4E71}</ProjectGuid>
         <OutputType>Library</OutputType>
         <AppDesignerFolder>Properties</AppDesignerFolder>
-        <RootNamespace>WebCompanion</RootNamespace>
-        <AssemblyName>WebCompanion</AssemblyName>
+        <RootNamespace>WebMap</RootNamespace>
+        <AssemblyName>WebMap</AssemblyName>
         <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
         <LangVersion>7.3</LangVersion>
         <FileAlignment>512</FileAlignment>
         <GamePath>C:\Program Files (x86)\Steam\steamapps\common\7 Days To Die</GamePath>
-        <ModName>WebCompanion</ModName>
+        <ModName>WebMap</ModName>
     </PropertyGroup>
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
         <PlatformTarget>AnyCPU</PlatformTarget>
@@ -65,8 +65,8 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Properties\AssemblyInfo.cs"/>
-        <Compile Include="WebCompanionMod.cs"/>
-        <Compile Include="ConsoleCmdWebCompanion.cs"/>
+        <Compile Include="WebMapMod.cs"/>
+        <Compile Include="ConsoleCmdWebMap.cs"/>
         <Compile Include="Companion.cs"/>
         <Compile Include="MapPatches.cs"/>
         <Compile Include="NavMirror.cs"/>

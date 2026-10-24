@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace WebCompanion
+namespace WebMap
 {
     // Mirrors the markers the in-game map draws (waypoints, bedroll, land claims, backpack, quests, vehicles,
     // party members, traders...). They all come from NavObjectManager.NavObjectList, filtered and styled the
@@ -48,7 +48,7 @@ namespace WebCompanion
                     // A marker whose tracked object just got destroyed; skip it this round
                     if (loggedError) continue;
                     loggedError = true;
-                    Log.Warning("[WebCompanion] Skipping map marker " + (nav != null ? nav.Key.ToString() : "null") + ": " + ex.Message);
+                    Log.Warning("[WebMap] Skipping map marker " + (nav != null ? nav.Key.ToString() : "null") + ": " + ex.Message);
                 }
             }
 
